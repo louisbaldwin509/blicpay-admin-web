@@ -1022,12 +1022,12 @@ export default function BlicPayAdmin() {
                         <div>
                           <p className="text-xs font-bold uppercase mb-1.5" style={{ color: C.muted }}>Dokiman</p>
                           <img src={`data:${kycDetail.docMimeType};base64,${kycDetail.docImage}`} alt="Dokiman"
-                            className="w-full rounded-xl object-cover" style={{ border: `1px solid ${C.border}`, aspectRatio: '4/3' }} />
+                            className="w-full rounded-xl object-contain" style={{ border: `1px solid ${C.border}`, background: C.bg, maxHeight: 420 }} />
                         </div>
                         <div>
                           <p className="text-xs font-bold uppercase mb-1.5" style={{ color: C.muted }}>Selfi</p>
                           <img src={`data:${kycDetail.selfieMimeType};base64,${kycDetail.selfieImage}`} alt="Selfi"
-                            className="w-full rounded-xl object-cover" style={{ border: `1px solid ${C.border}`, aspectRatio: '4/3' }} />
+                            className="w-full rounded-xl object-contain" style={{ border: `1px solid ${C.border}`, background: C.bg, maxHeight: 420 }} />
                         </div>
                       </div>
                     )}
