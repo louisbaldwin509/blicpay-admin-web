@@ -253,8 +253,8 @@ export default function BlicPayAdmin() {
   async function loadKyc(authToken = token) {
     setLoadingKyc(true);
     try {
-      const { submissions } = await apiFetch('/admin/kyc/pending', { token: authToken });
-      setKycSubmissions(submissions);
+      const { verifications } = await apiFetch('/admin/kyc/didit/pending', { token: authToken });
+      setKycSubmissions(verifications);
     } catch (err) { flash(err.message); } finally { setLoadingKyc(false); }
   }
 
@@ -263,8 +263,8 @@ export default function BlicPayAdmin() {
     setKycDetail(null);
     setKycRejectReason('');
     try {
-      const { submission } = await apiFetch(`/admin/kyc/${sub.id}`, { token });
-      setKycDetail(submission);
+      const { verification } = await apiFetch(`/admin/kyc/didit/${sub.id}`, { token });
+      setKycDetail(verification);
     } catch (err) { flash(err.message); }
   }
 
@@ -276,10 +276,10 @@ export default function BlicPayAdmin() {
     }
     try {
       if (decision === 'approve') {
-        await apiFetch(`/admin/kyc/${selectedKyc.id}/approve`, { method: 'POST', token, body: {} });
+        await apiFetch(`/admin/kyc/didit/${selectedKyc.id}/approve`, { method: 'POST', token, body: {} });
         flash('Kliyan an verifye.');
       } else {
-        await apiFetch(`/admin/kyc/${selectedKyc.id}/reject`, { method: 'POST', token, body: { reason: kycRejectReason.trim() } });
+        await apiFetch(`/admin/kyc/didit/${selectedKyc.id}/reject`, { method: 'POST', token, body: { reason: kycRejectReason.trim() } });
         flash('Demand lan refize.');
       }
       setSelectedKyc(null);
@@ -974,7 +974,7 @@ export default function BlicPayAdmin() {
               {!selectedKyc ? (
                 <>
                   <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Verifikasyon KYC</h1>
-                  <p className="text-sm mt-1" style={{ color: C.muted }}>{kycSubmissions.length} demand ap tann egzamen.</p>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>{kycSubmissions.length} demand ap tann egzamen — analize pa Didit.</p>
 
                   <div className="mt-6 flex flex-col gap-3">
                     {loadingKyc ? (
@@ -990,10 +990,13 @@ export default function BlicPayAdmin() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{s.user.fullName}</p>
-                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{s.user.phone} · {s.docType} · {new Date(s.submittedAt).toLocaleString('fr-FR')}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{s.user.phone} · {new Date(s.startedAt).toLocaleString('fr-FR')}</p>
                           </div>
                         </div>
-                        <Badge tone="amber">Ap tann</Badge>
+                        <div className="flex items-center gap-2">
+                          {s.diditStatus && <Badge tone={s.diditStatus === 'Approved' ? 'mint' : s.diditStatus === 'Declined' ? 'danger' : 'navy'}>{s.diditStatus}</Badge>}
+                          <Badge tone="amber">Ap tann</Badge>
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -1005,37 +1008,45 @@ export default function BlicPayAdmin() {
                   </button>
 
                   <div className="p-5 rounded-2xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: C.bg }}>
-                        <User size={18} color={C.navy} />
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: C.bg }}>
+                          <User size={18} color={C.navy} />
+                        </div>
+                        <div>
+                          <p className="font-bold">{selectedKyc.user.fullName}</p>
+                          <p className="text-xs" style={{ color: C.muted }}>{selectedKyc.user.phone}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-bold">{selectedKyc.user.fullName}</p>
-                        <p className="text-xs" style={{ color: C.muted }}>{selectedKyc.user.phone} · Dokiman: {selectedKyc.docType}</p>
-                      </div>
+                      {kycDetail?.diditStatus && (
+                        <Badge tone={kycDetail.diditStatus === 'Approved' ? 'mint' : kycDetail.diditStatus === 'Declined' ? 'danger' : 'navy'}>
+                          Didit: {kycDetail.diditStatus}
+                        </Badge>
+                      )}
                     </div>
 
                     {!kycDetail ? (
-                      <p className="text-sm mt-4" style={{ color: C.muted }}>Ap chaje imaj yo...</p>
+                      <p className="text-sm mt-4" style={{ color: C.muted }}>Ap chaje rapò a...</p>
                     ) : (
-                      <div className="mt-5 grid grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs font-bold uppercase mb-1.5" style={{ color: C.muted }}>Dokiman</p>
-                          <img src={`data:${kycDetail.docMimeType};base64,${kycDetail.docImage}`} alt="Dokiman"
-                            className="w-full rounded-xl object-contain" style={{ border: `1px solid ${C.border}`, background: C.bg, maxHeight: 420 }} />
+                      <>
+                        <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#E6F0FB', color: C.navy }}>
+                          <ShieldCheck size={15} className="shrink-0 mt-0.5" />
+                          Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.
                         </div>
-                        <div>
-                          <p className="text-xs font-bold uppercase mb-1.5" style={{ color: C.muted }}>Selfi</p>
-                          <img src={`data:${kycDetail.selfieMimeType};base64,${kycDetail.selfieImage}`} alt="Selfi"
-                            className="w-full rounded-xl object-contain" style={{ border: `1px solid ${C.border}`, background: C.bg, maxHeight: 420 }} />
-                        </div>
-                      </div>
-                    )}
 
-                    <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#FBF0DE', color: '#946115' }}>
-                      <AlertCircle size={15} className="shrink-0 mt-0.5" />
-                      Konpare non ak foto sou dokiman an ak selfi a anvan ou apwouve.
-                    </div>
+                        <p className="mt-4 text-xs font-bold uppercase" style={{ color: C.muted }}>Rapò konplè Didit</p>
+                        <pre className="mt-1.5 p-3 rounded-lg text-xs overflow-auto"
+                          style={{ background: C.bg, border: `1px solid ${C.border}`, maxHeight: 360, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                          {(() => {
+                            try {
+                              return JSON.stringify(JSON.parse(kycDetail.diditReport || '{}'), null, 2);
+                            } catch {
+                              return kycDetail.diditReport || 'Pa gen rapò disponib toujou — tann webhook Didit la rive.';
+                            }
+                          })()}
+                        </pre>
+                      </>
+                    )}
 
                     <textarea value={kycRejectReason} onChange={(e) => setKycRejectReason(e.target.value)}
                       placeholder="Rezon refi (obligatwa si ou refize)..."
