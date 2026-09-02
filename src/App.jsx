@@ -174,6 +174,9 @@ export default function BlicPayAdmin() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [userDetail, setUserDetail] = useState(null);
+  const [solDocTitle, setSolDocTitle] = useState('');
+  const [solDocFile, setSolDocFile] = useState(null);
+  const [solDocUploadingFor, setSolDocUploadingFor] = useState(null);
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
 
@@ -301,9 +304,50 @@ export default function BlicPayAdmin() {
     setUserDetail(null);
     setAdjustAmount('');
     setAdjustReason('');
+    setSolDocTitle('');
+    setSolDocFile(null);
     try {
       const detail = await apiFetch(`/admin/users/${u.id}`, { token });
       setUserDetail(detail);
+    } catch (err) { flash(err.message); }
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const [, base64] = reader.result.split(',');
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('Nou pa t ka li fichye a.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadSolDocument(membershipId) {
+    if (!solDocTitle.trim()) { flash('Bay dokiman an yon tit.'); return; }
+    if (!solDocFile) { flash('Chwazi yon fichye anvan.'); return; }
+    setSolDocUploadingFor(membershipId);
+    try {
+      const fileData = await readFileAsBase64(solDocFile);
+      await apiFetch(`/admin/sol/memberships/${membershipId}/documents`, {
+        method: 'POST', token,
+        body: { title: solDocTitle.trim(), fileData, fileMimeType: solDocFile.type, fileName: solDocFile.name },
+      });
+      flash('Dokiman an telechaje.');
+      setSolDocTitle('');
+      setSolDocFile(null);
+      if (selectedUser) openUser(selectedUser);
+    } catch (err) { flash(err.message); } finally { setSolDocUploadingFor(null); }
+  }
+
+  async function toggleSolFormApproved(membershipId, approved) {
+    try {
+      await apiFetch(`/admin/sol/memberships/${membershipId}/form-approve`, {
+        method: 'PATCH', token, body: { approved },
+      });
+      flash(approved ? 'Dokiman Sòl konfime.' : 'Estati dokiman an remèt an atant.');
+      if (selectedUser) openUser(selectedUser);
     } catch (err) { flash(err.message); }
   }
 
@@ -1224,11 +1268,47 @@ export default function BlicPayAdmin() {
             {userDetail && userDetail.solMemberships.length > 0 && (
               <>
                 <p className="mt-6 text-xs font-bold uppercase" style={{ color: C.muted }}>BLIC Sòl</p>
-                <div className="mt-2 flex flex-col gap-2">
+                <div className="mt-2 flex flex-col gap-3">
                   {userDetail.solMemberships.map((m) => (
-                    <div key={m.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ border: `1px solid ${C.border}` }}>
-                      <p className="text-xs font-semibold">{m.group.name}</p>
-                      <Badge tone={m.status === 'approved' ? 'mint' : m.status === 'rejected' ? 'danger' : 'amber'}>{m.status}</Badge>
+                    <div key={m.id} className="p-3 rounded-lg" style={{ border: `1px solid ${C.border}` }}>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold">{m.group.name}</p>
+                        <Badge tone={m.status === 'approved' ? 'mint' : m.status === 'rejected' ? 'danger' : 'amber'}>{m.status}</Badge>
+                      </div>
+
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs" style={{ color: C.muted }}>Dokiman Sòl la</span>
+                        <button onClick={() => toggleSolFormApproved(m.id, !m.formApproved)}
+                          className="bp-btn px-2.5 py-1 rounded-md text-xs font-semibold"
+                          style={{ background: m.formApproved ? '#E4F5EF' : '#FBF0DE', color: m.formApproved ? C.mint : '#946115' }}>
+                          {m.formApproved ? 'Konfime ✓' : 'Make konfime'}
+                        </button>
+                      </div>
+
+                      {(m.documents || []).length > 0 && (
+                        <div className="mt-2 flex flex-col gap-1.5">
+                          {m.documents.map((doc) => (
+                            <div key={doc.id} className="flex items-center justify-between text-xs px-2 py-1.5 rounded" style={{ background: C.bg }}>
+                              <span>{doc.title}</span>
+                              <span style={{ color: C.muted }}>{new Date(doc.uploadedAt).toLocaleDateString('fr-FR')}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-2.5 flex flex-col gap-1.5">
+                        <input value={solDocTitle} onChange={(e) => setSolDocTitle(e.target.value)}
+                          placeholder="Tit dokiman an (egzanp: Fiche d'informations)"
+                          className="px-2.5 py-1.5 rounded-md text-xs" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+                        <input type="file" accept="image/*,application/pdf"
+                          onChange={(e) => setSolDocFile(e.target.files?.[0] || null)}
+                          className="text-xs" />
+                        <button onClick={() => uploadSolDocument(m.id)} disabled={solDocUploadingFor === m.id}
+                          className="bp-btn py-1.5 rounded-md text-xs font-semibold text-white"
+                          style={{ background: C.navy, opacity: solDocUploadingFor === m.id ? 0.7 : 1 }}>
+                          {solDocUploadingFor === m.id ? 'Ap telechaje...' : 'Telechaje dokiman'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
