@@ -1097,6 +1097,41 @@ export default function BlicPayAdmin() {
                           Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.
                         </div>
 
+                        <p className="mt-4 text-xs font-bold uppercase" style={{ color: C.muted }}>Foto Didit jwenn</p>
+                        {(() => {
+                          let images = [];
+                          try {
+                            const parsed = JSON.parse(kycDetail.diditReport || '{}');
+                            const seen = new Set();
+                            const walk = (node) => {
+                              if (!node || typeof node !== 'object') return;
+                              for (const [key, value] of Object.entries(node)) {
+                                if (typeof value === 'string' && /_image$/.test(key) && /^https?:\/\//.test(value) && !seen.has(value)) {
+                                  seen.add(value);
+                                  images.push({ label: key.replace(/_/g, ' '), url: value });
+                                } else if (value && typeof value === 'object') {
+                                  walk(value);
+                                }
+                              }
+                            };
+                            walk(parsed);
+                          } catch {}
+                          if (images.length === 0) {
+                            return <p className="mt-1.5 text-xs" style={{ color: C.muted }}>Pa gen foto disponib toujou nan rapò a.</p>;
+                          }
+                          return (
+                            <div className="mt-1.5 grid grid-cols-2 gap-2.5">
+                              {images.map((img) => (
+                                <a key={img.url} href={img.url} target="_blank" rel="noreferrer" className="block">
+                                  <img src={img.url} alt={img.label} className="w-full rounded-lg object-cover"
+                                    style={{ border: `1px solid ${C.border}`, aspectRatio: '4/3', background: C.bg }} />
+                                  <p className="mt-1 text-xs capitalize" style={{ color: C.muted }}>{img.label}</p>
+                                </a>
+                              ))}
+                            </div>
+                          );
+                        })()}
+
                         <p className="mt-4 text-xs font-bold uppercase" style={{ color: C.muted }}>Rapò konplè Didit</p>
                         <pre className="mt-1.5 p-3 rounded-lg text-xs overflow-auto"
                           style={{ background: C.bg, border: `1px solid ${C.border}`, maxHeight: 360, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
