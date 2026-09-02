@@ -168,6 +168,7 @@ export default function BlicPayAdmin() {
   const [selectedKyc, setSelectedKyc] = useState(null);
   const [kycDetail, setKycDetail] = useState(null);
   const [kycRejectReason, setKycRejectReason] = useState('');
+  const [kycRefreshing, setKycRefreshing] = useState(false);
 
   // Itilizatè
   const [users, setUsers] = useState([]);
@@ -269,6 +270,16 @@ export default function BlicPayAdmin() {
       const { verification } = await apiFetch(`/admin/kyc/didit/${sub.id}`, { token });
       setKycDetail(verification);
     } catch (err) { flash(err.message); }
+  }
+
+  async function refreshKycFromDidit() {
+    if (!selectedKyc) return;
+    setKycRefreshing(true);
+    try {
+      const { verification } = await apiFetch(`/admin/kyc/didit/${selectedKyc.id}/refresh`, { method: 'POST', token });
+      setKycDetail(verification);
+      flash('Rapò a mete ajou dirèkteman soti nan Didit.');
+    } catch (err) { flash(err.message); } finally { setKycRefreshing(false); }
   }
 
   async function decideKyc(decision) {
@@ -1062,11 +1073,19 @@ export default function BlicPayAdmin() {
                           <p className="text-xs" style={{ color: C.muted }}>{selectedKyc.user.phone}</p>
                         </div>
                       </div>
-                      {kycDetail?.diditStatus && (
-                        <Badge tone={kycDetail.diditStatus === 'Approved' ? 'mint' : kycDetail.diditStatus === 'Declined' ? 'danger' : 'navy'}>
-                          Didit: {kycDetail.diditStatus}
-                        </Badge>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {kycDetail?.diditStatus && (
+                          <Badge tone={kycDetail.diditStatus === 'Approved' ? 'mint' : kycDetail.diditStatus === 'Declined' ? 'danger' : 'navy'}>
+                            Didit: {kycDetail.diditStatus}
+                          </Badge>
+                        )}
+                        <button onClick={refreshKycFromDidit} disabled={kycRefreshing}
+                          className="bp-btn px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1"
+                          style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}`, opacity: kycRefreshing ? 0.6 : 1 }}>
+                          <RefreshCw size={12} className={kycRefreshing ? 'animate-spin' : ''} />
+                          {kycRefreshing ? 'Ap chèche...' : 'Rafrechi'}
+                        </button>
+                      </div>
                     </div>
 
                     {!kycDetail ? (
