@@ -979,9 +979,10 @@ export default function BlicPayAdmin() {
                     </div>
                     {approvingSolId === r.id && (
                       <div className="mt-3 p-3 rounded-xl flex items-center gap-2 flex-wrap" style={{ background: C.bg }}>
-                        <span className="text-xs font-semibold" style={{ color: C.muted }}>Chwazi pozisyon:</span>
-                        {Array.from({ length: r.group.maxMembers }, (_, idx) => idx + 1).map((pos) => {
-                          const taken = r.takenPositions?.includes(pos);
+                        <span className="text-xs font-semibold" style={{ color: C.muted }}>Chwazi pozisyon (6 a 10):</span>
+                        {Array.from({ length: 5 }, (_, idx) => idx + 6).map((pos) => {
+                          const count = r.positionCounts?.[pos] || 0;
+                          const taken = count >= 2;
                           return (
                             <button key={pos} disabled={taken} onClick={() => approveSol(r.id, pos)}
                               className="bp-btn w-8 h-8 rounded-lg text-xs font-bold flex items-center justify-center"
@@ -989,7 +990,7 @@ export default function BlicPayAdmin() {
                                 background: taken ? C.border : C.card, color: taken ? C.muted : C.navy,
                                 border: `1px solid ${taken ? C.border : C.navy}`, cursor: taken ? 'not-allowed' : 'pointer',
                               }}>
-                              {pos}
+                              {pos}{count > 0 ? `(${count}/2)` : ''}
                             </button>
                           );
                         })}
@@ -1096,6 +1097,63 @@ export default function BlicPayAdmin() {
                           <ShieldCheck size={15} className="shrink-0 mt-0.5" />
                           Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.
                         </div>
+
+                        <p className="mt-4 text-xs font-bold uppercase" style={{ color: C.muted }}>Rezime chif ak eskò</p>
+                        {(() => {
+                          let sections = [];
+                          try {
+                            const parsed = JSON.parse(kycDetail.diditReport || '{}');
+                            const SCORE_KEYS = /^(score|similarity|confidence|face_match_similarity|liveness_confidence)$/i;
+                            const SKIP_KEYS = new Set(['session_id', 'workflow_id', 'application_id', 'event_id', 'source_image_session_id']);
+
+                            const collectFromItem = (item, label) => {
+                              if (!item || typeof item !== 'object') return;
+                              const status = typeof item.status === 'string' ? item.status : null;
+                              let score = null;
+                              for (const [k, v] of Object.entries(item)) {
+                                if (typeof v === 'number' && SCORE_KEYS.test(k) && !SKIP_KEYS.has(k)) { score = v; break; }
+                              }
+                              if (status || score != null) sections.push({ label, status, score });
+                            };
+
+                            for (const [key, value] of Object.entries(parsed)) {
+                              if (SKIP_KEYS.has(key)) continue;
+                              const label = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+                              if (Array.isArray(value)) {
+                                value.forEach((item, i) => collectFromItem(item, value.length > 1 ? `${label} ${i + 1}` : label));
+                              } else if (value && typeof value === 'object' && key !== 'features') {
+                                collectFromItem(value, label);
+                              }
+                            }
+                          } catch {}
+
+                          if (sections.length === 0) {
+                            return <p className="mt-1.5 text-xs" style={{ color: C.muted }}>Pa gen eskò disponib toujou.</p>;
+                          }
+
+                          return (
+                            <div className="mt-1.5 flex flex-col gap-2">
+                              {sections.map((s, i) => (
+                                <div key={i} className="p-2.5 rounded-lg" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-semibold">{s.label}</span>
+                                    {s.status && (
+                                      <Badge tone={s.status === 'Approved' ? 'mint' : s.status === 'Declined' ? 'danger' : 'amber'}>{s.status}</Badge>
+                                    )}
+                                  </div>
+                                  {s.score != null && (
+                                    <div className="mt-1.5 flex items-center gap-2">
+                                      <div className="flex-1 rounded-full overflow-hidden" style={{ height: 6, background: C.border }}>
+                                        <div style={{ width: `${Math.min(100, s.score)}%`, height: '100%', background: s.score >= 80 ? C.mint : s.score >= 50 ? '#D98B1D' : C.danger }} />
+                                      </div>
+                                      <span className="text-xs font-semibold" style={{ color: C.ink }}>{Math.round(s.score * 10) / 10}%</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
 
                         <p className="mt-4 text-xs font-bold uppercase" style={{ color: C.muted }}>Foto Didit jwenn</p>
                         {(() => {
