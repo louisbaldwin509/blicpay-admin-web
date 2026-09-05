@@ -3,7 +3,7 @@ import {
   Bell, ShieldCheck, Users, Clock, Check, X, Building2, Smartphone,
   DollarSign, Banknote, ArrowLeftRight, LogOut, LayoutGrid, Wallet,
   AlertCircle, ChevronRight, ChevronLeft, Search, RefreshCw, ArrowDownLeft,
-  PiggyBank, HandCoins, FileText, User, Phone, Lock, BadgeCheck,
+  PiggyBank, HandCoins, FileText, User, Phone, Lock, BadgeCheck, Eye, TrendingUp, UserPlus,
 } from 'lucide-react';
 
 const API_BASE_URL = 'https://api.blicpayht.com';
@@ -42,11 +42,11 @@ const fontDisplay = { fontFamily: "'Manrope', sans-serif" };
 const fontMono = { fontFamily: "'IBM Plex Mono', monospace" };
 
 const methodIcons = {
-  moncash: { label: 'Mon Cash', icon: DollarSign, color: '#1E9E7C' },
-  natcash: { label: 'NatCash', icon: Smartphone, color: '#1C6FBF' },
-  usdt: { label: 'USDT', icon: Banknote, color: '#0E9E86' },
-  zelle: { label: 'Zelle', icon: ArrowLeftRight, color: '#6D3FD1' },
-  biwo: { label: 'Nan biwo', icon: Building2, color: '#946115' },
+  moncash: { label: 'Mon Cash', icon: DollarSign, color: '#1E9E7C', logo: 'https://blicpayht.com/logos/moncash.jpg' },
+  natcash: { label: 'NatCash', icon: Smartphone, color: '#1C6FBF', logo: 'https://blicpayht.com/logos/natcash.jpg' },
+  usdt: { label: 'USDT', icon: Banknote, color: '#0E9E86', logo: 'https://blicpayht.com/logos/usdt.jpg' },
+  zelle: { label: 'Zelle', icon: ArrowLeftRight, color: '#6D3FD1', logo: 'https://blicpayht.com/logos/zelle.png' },
+  biwo: { label: 'Nan biwo', icon: Building2, color: '#946115', logo: null },
 };
 
 const DEMO_TOKEN = 'demo-token';
@@ -174,6 +174,16 @@ export default function BlicPayAdmin() {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [viewingReceipt, setViewingReceipt] = useState(null);
+  const [confirmingDeposit, setConfirmingDeposit] = useState(null);
+  const [financeData, setFinanceData] = useState(null);
+  const [financePeriod, setFinancePeriod] = useState('month');
+  const [loadingFinance, setLoadingFinance] = useState(false);
+  const [agents, setAgents] = useState([]);
+  const [loadingAgents, setLoadingAgents] = useState(false);
+  const [showAgentForm, setShowAgentForm] = useState(false);
+  const [agentForm, setAgentForm] = useState({ fullName: '', phone: '', password: '', branch: '' });
+  const [creatingAgent, setCreatingAgent] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
   const [solDocTitle, setSolDocTitle] = useState('');
   const [solDocFile, setSolDocFile] = useState(null);
@@ -310,6 +320,37 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); } finally { setLoadingUsers(false); }
   }
 
+  async function loadFinance(p = financePeriod) {
+    setLoadingFinance(true);
+    try {
+      const data = await apiFetch(`/admin/finance/summary?period=${p}`, { token });
+      setFinanceData(data);
+    } catch (err) { flash(err.message); } finally { setLoadingFinance(false); }
+  }
+
+  async function loadAgents() {
+    setLoadingAgents(true);
+    try {
+      const { agents: ag } = await apiFetch('/admin/agents', { token });
+      setAgents(ag);
+    } catch (err) { flash(err.message); } finally { setLoadingAgents(false); }
+  }
+
+  async function createAgent() {
+    if (!agentForm.fullName.trim() || !agentForm.phone.trim() || !agentForm.password || !agentForm.branch.trim()) {
+      flash('Ranpli tout chan yo.');
+      return;
+    }
+    setCreatingAgent(true);
+    try {
+      await apiFetch('/admin/agents', { method: 'POST', token, body: agentForm });
+      flash('Kont ajan an kreye.');
+      setAgentForm({ fullName: '', phone: '', password: '', branch: '' });
+      setShowAgentForm(false);
+      await loadAgents();
+    } catch (err) { flash(err.message); } finally { setCreatingAgent(false); }
+  }
+
   async function openUser(u) {
     setSelectedUser(u);
     setUserDetail(null);
@@ -412,12 +453,13 @@ export default function BlicPayAdmin() {
     setLoginLoading(true);
     try {
       const { token: newToken, user } = await apiFetch('/auth/login', { method: 'POST', body: loginForm });
-      if (user.role !== 'admin') {
+      if (user.role !== 'admin' && user.role !== 'agent') {
         setLoginError('Kont sa a pa gen aksè admin.');
         return;
       }
       setToken(newToken);
       setAdmin(user);
+      setNav(user.role === 'agent' ? 'pending' : 'overview');
       await loadPending(newToken);
     } catch (err) {
       setLoginError(err.message);
@@ -519,17 +561,20 @@ export default function BlicPayAdmin() {
   const totalLoansActive = loans.filter((l) => l.status === 'active').reduce((s, l) => s + l.amount, 0);
   const pendingLoansCount = loans.filter((l) => l.status === 'pending').length;
 
-  const NAV_ITEMS = [
-    { id: 'overview', label: 'Apèsi', icon: LayoutGrid },
+  const NAV_ITEMS_ALL = [
+    { id: 'overview', label: 'Apèsi', icon: LayoutGrid, adminOnly: true },
     { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
     { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => loadWithdrawals() },
-    { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals() },
-    { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans() },
-    { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers() },
-    { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol() },
-    { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc() },
-    { id: 'users', label: 'Itilizatè', icon: User, onOpen: () => loadUsers() },
+    { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
+    { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: true },
+    { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
+    { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: true },
+    { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
+    { id: 'users', label: 'Itilizatè', icon: User, onOpen: () => loadUsers(), adminOnly: true },
+    { id: 'agents', label: 'Ajan', icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
+    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: true },
   ];
+  const NAV_ITEMS = NAV_ITEMS_ALL.filter((item) => !item.adminOnly || admin?.role === 'admin');
 
   function goTo(item) {
     setNav(item.id);
@@ -723,13 +768,16 @@ export default function BlicPayAdmin() {
                     <div key={d.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
                       style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: M.color }}>
-                          <M.icon size={16} color="#fff" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                          {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={16} color="#fff" />}
                         </div>
                         <div>
                           <p className="text-sm font-semibold">{d.user}</p>
                           <p className="text-xs mt-0.5" style={{ color: C.muted }}>{d.phone} · {d.date}</p>
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{d.reference}</p>
+                          {d.transactionId && (
+                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>TID: {d.transactionId}</p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
@@ -737,13 +785,20 @@ export default function BlicPayAdmin() {
                           <p style={{ ...fontMono, fontSize: 15, fontWeight: 600 }}>{money(d.amount)}</p>
                           <Badge tone="amber">{M.label}</Badge>
                         </div>
+                        {d.proofImage && (
+                          <button onClick={() => setViewingReceipt(d)}
+                            className="bp-btn w-9 h-9 rounded-lg flex items-center justify-center"
+                            style={{ border: `1px solid ${C.border}` }} aria-label="Wè resi a">
+                            <Eye size={15} color={C.navy} />
+                          </button>
+                        )}
                         <div className="flex items-center gap-2">
                           <button onClick={() => rejectDeposit(d.id)}
                             className="bp-btn w-9 h-9 rounded-lg flex items-center justify-center"
                             style={{ border: `1px solid ${C.border}` }} aria-label="Rejte">
                             <X size={15} color={C.danger} />
                           </button>
-                          <button onClick={() => confirmDeposit(d.id)}
+                          <button onClick={() => setConfirmingDeposit(d)}
                             className="bp-btn px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
                             style={{ background: C.mint, color: '#fff' }}>
                             <Check size={13} /> Konfime
@@ -778,8 +833,8 @@ export default function BlicPayAdmin() {
                     <div key={w.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
                       style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0" style={{ background: M.color }}>
-                          <M.icon size={16} color="#fff" />
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                          {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={16} color="#fff" />}
                         </div>
                         <div>
                           <p className="text-sm font-semibold">{w.user}</p>
@@ -1426,6 +1481,197 @@ export default function BlicPayAdmin() {
                 </div>
               </>
             )}
+          </div>
+        </>
+      )}
+
+      {nav === 'finance' && (
+        <div className="fadein">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Finans</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>Revni nèt BLICPay, detaye pa sous.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {[
+                { id: 'day', label: 'Jodi a' },
+                { id: 'month', label: 'Mwa sa a' },
+                { id: 'year', label: 'Ane sa a' },
+                { id: 'all', label: 'Tout tan' },
+              ].map((p) => (
+                <button key={p.id} onClick={() => { setFinancePeriod(p.id); loadFinance(p.id); }}
+                  className="bp-btn px-3.5 py-2 rounded-lg text-xs font-semibold"
+                  style={financePeriod === p.id
+                    ? { background: C.navy, color: '#fff' }
+                    : { background: C.card, color: C.muted, border: `1px solid ${C.border}` }}>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {loadingFinance || !financeData ? (
+            <p className="text-sm mt-8 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+          ) : (
+            <>
+              <div className="mt-6 p-6 rounded-2xl" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})` }}>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>Revni nèt total</p>
+                <p className="mt-1" style={{ ...fontDisplay, fontWeight: 800, fontSize: 34, color: '#fff' }}>
+                  {money(financeData.total)}
+                </p>
+              </div>
+
+              <p className="mt-6 text-xs font-bold uppercase" style={{ color: C.muted }}>Detay pa sous</p>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <StatCard label="Frè entegrasyon Sòl" value={money(financeData.breakdown.solIntegrationFees)} sub="1,5% sou pot total" accent={C.navy} />
+                <StatCard label="Penalite reta Sòl" value={money(financeData.breakdown.solPenalties)} sub="Kotizasyon an reta" accent="#946115" />
+                <StatCard label="Frè retrè" value={money(financeData.breakdown.withdrawalFees)} sub="1,25% sou lajan elektwonik" accent={C.mint} />
+              </div>
+
+              <p className="mt-6 text-xs font-bold uppercase" style={{ color: C.muted }}>Detay pa siikisal</p>
+              {Object.keys(financeData.byBranch || {}).length === 0 ? (
+                <p className="mt-2 text-sm" style={{ color: C.muted }}>Pa gen okenn tranzaksyon konfime pa yon ajan pandan peryòd sa a.</p>
+              ) : (
+                <div className="mt-3 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+                  {Object.entries(financeData.byBranch).map(([branch, stats], i) => (
+                    <div key={branch} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+                      style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                      <p className="text-sm font-semibold">{branch}</p>
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <p className="text-xs" style={{ color: C.muted }}>Volim</p>
+                          <p className="text-sm font-semibold" style={{ ...fontMono }}>{money(stats.volume)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs" style={{ color: C.muted }}>Revni</p>
+                          <p className="text-sm font-semibold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs" style={{ color: C.muted }}>Tranzaksyon</p>
+                          <p className="text-sm font-semibold">{stats.count}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#E6F0FB', color: C.navy }}>
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                Chif sa yo pa gen ladan Prè — fonksyonalite a poko aktive.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {nav === 'agents' && (
+        <div className="fadein">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Ajan</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>Kont ajan pou chak siikisal.</p>
+            </div>
+            <button onClick={() => setShowAgentForm((v) => !v)}
+              className="bp-btn px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+              style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})` }}>
+              <UserPlus size={15} /> Nouvo ajan
+            </button>
+          </div>
+
+          {showAgentForm && (
+            <div className="mt-5 p-5 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input value={agentForm.fullName} onChange={(e) => setAgentForm((f) => ({ ...f, fullName: e.target.value }))}
+                  placeholder="Non konplè" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+                <input value={agentForm.phone} onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
+                  placeholder="Nimewo telefòn" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+                <input type="password" value={agentForm.password} onChange={(e) => setAgentForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Modpas (6+ karaktè)" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+                <input value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
+                  placeholder="Siikisal (egzanp: Succursale 1)" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+              </div>
+              <button onClick={createAgent} disabled={creatingAgent}
+                className="bp-btn mt-4 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
+                style={{ background: C.mint, opacity: creatingAgent ? 0.7 : 1 }}>
+                {creatingAgent ? 'Ap kreye...' : 'Kreye kont ajan an'}
+              </button>
+            </div>
+          )}
+
+          {loadingAgents ? (
+            <p className="text-sm mt-8 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+          ) : agents.length === 0 ? (
+            <p className="text-sm mt-8 text-center" style={{ color: C.muted }}>Pa gen okenn ajan kreye toujou.</p>
+          ) : (
+            <div className="mt-5 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+              {agents.map((a, i) => (
+                <div key={a.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+                  style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                  <div>
+                    <p className="text-sm font-semibold">{a.fullName}</p>
+                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>{a.phone} · {new Date(a.createdAt).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                  <Badge tone={a.blocked ? 'danger' : 'navy'}>{a.branch}</Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {confirmingDeposit && (
+        <>
+          <div onClick={() => setConfirmingDeposit(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 52 }} />
+          <div className="fadein" style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 380,
+            background: C.card, borderRadius: 16, zIndex: 53, padding: 24,
+          }}>
+            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#FBF0DE' }}>
+              <AlertCircle size={16} color="#946115" className="shrink-0 mt-0.5" />
+              <p className="text-xs" style={{ color: '#946115' }}>
+                Verifye peman an FINI e reyèlman rive nan kont ou anvan ou konfime — aksyon sa a p ap ka anile.
+              </p>
+            </div>
+            <p className="text-sm font-semibold">Konfime depo {confirmingDeposit.user}?</p>
+            <p className="text-xs mt-1" style={{ color: C.muted }}>
+              {money(confirmingDeposit.amount)} · {methodIcons[confirmingDeposit.method]?.label || confirmingDeposit.method}
+              {confirmingDeposit.transactionId ? ` · TID: ${confirmingDeposit.transactionId}` : ''}
+            </p>
+            <div className="flex gap-2.5 mt-5">
+              <button onClick={() => setConfirmingDeposit(null)}
+                className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: C.bg, color: C.muted }}>
+                Anile
+              </button>
+              <button onClick={() => { confirmDeposit(confirmingDeposit.id); setConfirmingDeposit(null); }}
+                className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint }}>
+                Wi, konfime li
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {viewingReceipt && (
+        <>
+          <div onClick={() => setViewingReceipt(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 50 }} />
+          <div className="fadein" style={{
+            position: 'fixed', top: '6%', left: '5%', right: '5%', bottom: '6%', background: C.card,
+            borderRadius: 16, zIndex: 51, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+          }}>
+            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div>
+                <p className="text-sm font-semibold">Resi — {viewingReceipt.user}</p>
+                <p className="text-xs" style={{ ...fontMono, color: C.muted }}>TID: {viewingReceipt.transactionId} · {money(viewingReceipt.amount)}</p>
+              </div>
+              <button onClick={() => setViewingReceipt(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
+                <X size={14} color={C.muted} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-3 flex items-center justify-center" style={{ background: C.bg }}>
+              <img src={`data:${viewingReceipt.proofMimeType};base64,${viewingReceipt.proofImage}`} alt="Resi"
+                className="max-w-full max-h-full rounded-lg object-contain" />
+            </div>
           </div>
         </>
       )}
