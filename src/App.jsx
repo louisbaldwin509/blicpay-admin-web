@@ -183,6 +183,10 @@ export default function BlicPayAdmin() {
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [agentForm, setAgentForm] = useState({ fullName: '', phone: '', password: '', branch: '' });
+  const [branches, setBranches] = useState([]);
+  const [loadingBranches, setLoadingBranches] = useState(false);
+  const [newBranchName, setNewBranchName] = useState('');
+  const [creatingBranch, setCreatingBranch] = useState(false);
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
   const [solDocTitle, setSolDocTitle] = useState('');
@@ -333,7 +337,30 @@ export default function BlicPayAdmin() {
     try {
       const { agents: ag } = await apiFetch('/admin/agents', { token });
       setAgents(ag);
+      await loadBranches();
     } catch (err) { flash(err.message); } finally { setLoadingAgents(false); }
+  }
+
+  async function loadBranches() {
+    setLoadingBranches(true);
+    try {
+      const { branches: br } = await apiFetch('/admin/branches', { token });
+      setBranches(br);
+    } catch (err) { flash(err.message); } finally { setLoadingBranches(false); }
+  }
+
+  async function createBranch() {
+    if (!newBranchName.trim()) {
+      flash('Antre non siikisal la.');
+      return;
+    }
+    setCreatingBranch(true);
+    try {
+      await apiFetch('/admin/branches', { method: 'POST', token, body: { name: newBranchName.trim() } });
+      flash('Siikisal la kreye.');
+      setNewBranchName('');
+      await loadBranches();
+    } catch (err) { flash(err.message); } finally { setCreatingBranch(false); }
   }
 
   async function createAgent() {
@@ -1579,6 +1606,28 @@ export default function BlicPayAdmin() {
             </button>
           </div>
 
+          <div className="mt-5 p-5 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+            <p className="text-xs font-bold uppercase" style={{ color: C.muted }}>Siikisal yo</p>
+            <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+              {branches.map((b) => (
+                <Badge key={b.id} tone="navy">{b.name}</Badge>
+              ))}
+              {branches.length === 0 && !loadingBranches && (
+                <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn siikisal kreye toujou.</p>
+              )}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)}
+                placeholder="Non nouvo siikisal la (egzanp: Cap-Haïtien)"
+                className="flex-1 px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+              <button onClick={createBranch} disabled={creatingBranch}
+                className="bp-btn px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
+                style={{ background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
+                {creatingBranch ? 'Ap ajoute...' : 'Ajoute'}
+              </button>
+            </div>
+          </div>
+
           {showAgentForm && (
             <div className="mt-5 p-5 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1588,8 +1637,13 @@ export default function BlicPayAdmin() {
                   placeholder="Nimewo telefòn" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
                 <input type="password" value={agentForm.password} onChange={(e) => setAgentForm((f) => ({ ...f, password: e.target.value }))}
                   placeholder="Modpas (6+ karaktè)" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
-                <input value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
-                  placeholder="Siikisal (egzanp: Succursale 1)" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+                <select value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
+                  className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+                  <option value="">Chwazi siikisal...</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.name}>{b.name}</option>
+                  ))}
+                </select>
               </div>
               <button onClick={createAgent} disabled={creatingAgent}
                 className="bp-btn mt-4 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
