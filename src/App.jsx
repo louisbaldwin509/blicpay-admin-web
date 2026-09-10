@@ -25,16 +25,19 @@ async function apiFetch(path, { method = 'GET', body, token } = {}) {
 }
 
 const C = {
-  bg: '#F4F6FA',
+  bg: '#F7F5F1',
+  paper: '#F7F5F1',
   card: '#FFFFFF',
-  border: '#E6E9F0',
-  ink: '#0B1B33',
-  muted: '#6B7684',
-  navy: '#143A73',
-  sky: '#29B6E8',
-  mint: '#1E9E7C',
-  amber: '#D98B1D',
-  danger: '#D14343',
+  border: '#E4DED2',
+  ink: '#1C2321',
+  muted: '#6F6A5E',
+  navy: '#0F2D52',
+  navyDeep: '#0A2140',
+  sky: '#2C8FB0',
+  gold: '#B9862F',
+  mint: '#3D7A5C',
+  amber: '#B9862F',
+  danger: '#B5482E',
   purple: '#6D3FD1',
 };
 
@@ -46,7 +49,7 @@ const methodIcons = {
   natcash: { label: 'NatCash', icon: Smartphone, color: '#1C6FBF', logo: 'https://blicpayht.com/logos/natcash.jpg' },
   usdt: { label: 'USDT', icon: Banknote, color: '#0E9E86', logo: 'https://blicpayht.com/logos/usdt.jpg' },
   zelle: { label: 'Zelle', icon: ArrowLeftRight, color: '#6D3FD1', logo: 'https://blicpayht.com/logos/zelle.png' },
-  biwo: { label: 'Nan biwo', icon: Building2, color: '#946115', logo: null },
+  biwo: { label: 'Nan biwo', icon: Building2, color: '#8A6423', logo: null },
 };
 
 const DEMO_TOKEN = 'demo-token';
@@ -78,11 +81,11 @@ function Logo({ size = 28 }) {
 function Badge({ children, tone = 'muted' }) {
   const map = {
     muted: { bg: '#EEF1F6', fg: C.muted },
-    mint: { bg: '#E4F5EF', fg: C.mint },
-    amber: { bg: '#FBF0DE', fg: '#946115' },
-    navy: { bg: '#E6F0FB', fg: C.navy },
+    mint: { bg: '#E9F0EA', fg: C.mint },
+    amber: { bg: '#F3E8D2', fg: '#8A6423' },
+    navy: { bg: '#EFE7D8', fg: C.navy },
     premium: { bg: '#F4EBFF', fg: '#6D3FD1' },
-    danger: { bg: '#FBEAEA', fg: C.danger },
+    danger: { bg: '#F5E5DF', fg: C.danger },
   };
   const s = map[tone];
   return (
@@ -611,23 +614,28 @@ export default function BlicPayAdmin() {
 
   if (!token) {
     return (
-      <div style={{ background: C.bg, minHeight: '100%' }} className="w-full flex items-center justify-center px-6 py-16">
+      <div style={{ background: C.navyDeep, minHeight: '100%' }} className="w-full flex items-center justify-center px-6 py-16 relative overflow-hidden">
         <style>{`
           @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
           * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
           .bp-btn { transition: all .15s ease; }
-          .bp-btn:hover { filter: brightness(1.04); }
-          input:focus { outline: none; border-color: ${C.sky} !important; }
+          .bp-btn:hover { filter: brightness(1.06); }
+          input:focus { outline: none; border-color: ${C.gold} !important; }
         `}</style>
-        <div className="w-full max-w-sm p-7 rounded-2xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-          <div className="flex items-center gap-2 mb-1">
-            <Logo size={26} />
-            <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: C.ink }}>
-              BLIC<span style={{ color: C.sky }}>Pay</span>
+        <div style={{ position: 'absolute', top: -120, right: -80, width: 360, height: 360, borderRadius: '50%', background: 'rgba(185,134,47,0.08)' }} />
+        <div style={{ position: 'absolute', bottom: -140, left: -100, width: 320, height: 320, borderRadius: '50%', background: 'rgba(44,143,176,0.08)' }} />
+
+        <div className="w-full max-w-sm rounded-2xl relative" style={{ background: C.card, padding: '32px 28px', boxShadow: '0 24px 48px rgba(0,0,0,0.28)' }}>
+          <div className="flex items-center gap-2">
+            <Logo size={28} />
+            <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 18, color: C.ink }}>
+              BLIC<span style={{ color: C.gold }}>Pay</span>
             </span>
           </div>
-          <p className="text-xs font-semibold tracking-wide mt-1" style={{ color: C.muted }}>ESPAS ADMIN</p>
-          <div className="mt-5 space-y-3">
+          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 21, color: C.ink, marginTop: 18 }}>Byenveni</h1>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>Konekte pou jere kont BLICPay yo.</p>
+
+          <div style={{ marginTop: 24 }} className="space-y-3">
             <input placeholder="Nimewo telefòn" value={loginForm.phone}
               onChange={(e) => setLoginForm((f) => ({ ...f, phone: e.target.value }))}
               className="w-full px-4 py-3 rounded-lg text-sm"
@@ -638,13 +646,12 @@ export default function BlicPayAdmin() {
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.ink }} />
           </div>
           {loginError && (
-            <p className="mt-3 text-xs flex items-center gap-1.5" style={{ color: C.danger }}>
+            <p className="text-xs flex items-center gap-1.5" style={{ color: C.danger, marginTop: 12 }}>
               <AlertCircle size={13} /> {loginError}
             </p>
           )}
           <button onClick={handleLogin} disabled={loginLoading}
-            className="bp-btn mt-5 w-full py-3 rounded-lg font-semibold text-white"
-            style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})`, opacity: loginLoading ? 0.7 : 1 }}>
+            className="bp-btn w-full py-3 rounded-lg font-semibold text-white" style={{ marginTop: 20, background: C.navy, opacity: loginLoading ? 0.7 : 1 }}>
             {loginLoading ? 'Tann...' : 'Konekte'}
           </button>
         </div>
@@ -676,26 +683,31 @@ export default function BlicPayAdmin() {
 
       <div className="flex" style={{ minHeight: '100%' }}>
         {/* sidebar */}
-        <div className="w-56 shrink-0 hidden md:flex flex-col" style={{ background: C.card, borderRight: `1px solid ${C.border}`, padding: '28px 18px', boxShadow: '1px 0 0 rgba(11,27,51,0.02)' }}>
-          <div className="flex items-center gap-2 px-2" style={{ marginBottom: 36 }}>
+        <div className="w-56 shrink-0 hidden md:flex flex-col" style={{ background: C.navyDeep, padding: '28px 18px' }}>
+          <div className="flex items-center gap-2 px-2" style={{ marginBottom: 40 }}>
             <Logo size={26} />
-            <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15 }}>
-              BLIC<span style={{ color: C.sky }}>Pay</span>
+            <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15, color: '#fff' }}>
+              BLIC<span style={{ color: C.gold }}>Pay</span>
             </span>
           </div>
           {NAV_ITEMS.map((item) => (
             <button key={item.id} onClick={() => goTo(item)}
               className="nav-item w-full flex items-center gap-2.5 rounded-lg text-sm font-medium"
-              style={{ padding: '10px 12px', marginBottom: 4, background: nav === item.id ? '#E6F0FB' : 'transparent', color: nav === item.id ? C.navy : C.muted }}>
+              style={{
+                padding: '10px 12px', marginBottom: 2,
+                background: nav === item.id ? 'rgba(255,255,255,0.08)' : 'transparent',
+                color: nav === item.id ? '#fff' : 'rgba(255,255,255,0.55)',
+                borderLeft: nav === item.id ? `2px solid ${C.gold}` : '2px solid transparent',
+              }}>
               <item.icon size={16} />
               <span className="flex-1 text-left">{item.label}</span>
               {item.count > 0 && <Badge tone="danger">{item.count}</Badge>}
             </button>
           ))}
-          <div className="mt-auto">
+          <div className="mt-auto" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14, marginTop: 14 }}>
             <button onClick={logout}
               className="w-full flex items-center gap-2.5 rounded-lg text-sm font-medium"
-              style={{ padding: '10px 12px', color: C.muted }}>
+              style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.5)' }}>
               <LogOut size={16} /> Dekonekte
             </button>
           </div>
@@ -709,7 +721,7 @@ export default function BlicPayAdmin() {
               <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15 }}>BLICPay Admin</span>
             </div>
             <div className="hidden md:flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})` }}>
+              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: C.navy }}>
                 <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{initials(admin?.fullName || '')}</span>
               </div>
               <div>
@@ -729,7 +741,7 @@ export default function BlicPayAdmin() {
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Apèsi</h1>
               <p className="text-sm mt-1" style={{ color: C.muted }}>Rezime aktivite BLICPay jodi a.</p>
 
-              <div className="mt-6 p-6 rounded-2xl relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})` }}>
+              <div className="mt-6 p-6 rounded-2xl relative overflow-hidden" style={{ background: C.navy }}>
                 <p className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>TOTAL TOUT ANTRE YO</p>
                 <p style={{ ...fontDisplay, fontSize: 34, fontWeight: 800, color: '#fff', marginTop: 6 }}>
                   {money(totalPendingAmount + totalGoalsSaved + totalTransferVolume)}
@@ -848,7 +860,7 @@ export default function BlicPayAdmin() {
                 })}
               </div>
 
-              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#E6F0FB', color: C.navy }}>
+              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 Verifye referans lan ak resi kach la anvan ou konfime yon depo biwo.
               </div>
@@ -1186,7 +1198,7 @@ export default function BlicPayAdmin() {
                       <p className="text-sm mt-4" style={{ color: C.muted }}>Ap chaje rapò a...</p>
                     ) : (
                       <>
-                        <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#E6F0FB', color: C.navy }}>
+                        <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
                           <ShieldCheck size={15} className="shrink-0 mt-0.5" />
                           Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.
                         </div>
@@ -1425,7 +1437,7 @@ export default function BlicPayAdmin() {
               </button>
             </div>
 
-            <div className="mt-4 p-4 rounded-xl" style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})` }}>
+            <div className="mt-4 p-4 rounded-xl" style={{ background: C.navy }}>
               <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>BALANS AKTYÈL</p>
               <p style={{ ...fontDisplay, fontSize: 22, fontWeight: 800, color: '#fff' }}>{money(selectedUser.balance)}</p>
             </div>
@@ -1485,7 +1497,7 @@ export default function BlicPayAdmin() {
                         <span className="text-xs" style={{ color: C.muted }}>Dokiman Sòl la</span>
                         <button onClick={() => toggleSolFormApproved(m.id, !m.formApproved)}
                           className="bp-btn px-2.5 py-1 rounded-md text-xs font-semibold"
-                          style={{ background: m.formApproved ? '#E4F5EF' : '#FBF0DE', color: m.formApproved ? C.mint : '#946115' }}>
+                          style={{ background: m.formApproved ? '#E9F0EA' : '#F3E8D2', color: m.formApproved ? C.mint : '#8A6423' }}>
                           {m.formApproved ? 'Konfime ✓' : 'Make konfime'}
                         </button>
                       </div>
@@ -1553,8 +1565,8 @@ export default function BlicPayAdmin() {
             <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
           ) : (
             <>
-              <div className="rounded-2xl relative overflow-hidden" style={{ marginTop: 28, padding: 28, background: `linear-gradient(135deg, ${C.navy}, ${C.sky})`, boxShadow: '0 8px 20px rgba(20,58,115,0.18)' }}>
-                <div style={{ position: 'absolute', top: -50, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+              <div className="rounded-2xl relative overflow-hidden" style={{ marginTop: 28, padding: 28, background: `linear-gradient(135deg, ${C.navy}, ${C.navyDeep})`, boxShadow: '0 8px 20px rgba(15,45,82,0.25)' }}>
+                <div style={{ position: 'absolute', top: -50, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(185,134,47,0.12)' }} />
                 <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.75)' }}>Revni nèt total</p>
                 <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 36, color: '#fff', marginTop: 4 }}>
                   {money(financeData.total)}
@@ -1564,7 +1576,7 @@ export default function BlicPayAdmin() {
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 32, marginBottom: 14 }}>Detay pa sous</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <StatCard label="Frè entegrasyon Sòl" value={money(financeData.breakdown.solIntegrationFees)} sub="1,5% sou pot total" accent={C.navy} />
-                <StatCard label="Penalite reta Sòl" value={money(financeData.breakdown.solPenalties)} sub="Kotizasyon an reta" accent="#946115" />
+                <StatCard label="Penalite reta Sòl" value={money(financeData.breakdown.solPenalties)} sub="Kotizasyon an reta" accent="#8A6423" />
                 <StatCard label="Frè retrè" value={money(financeData.breakdown.withdrawalFees)} sub="1,25% sou lajan elektwonik" accent={C.mint} />
               </div>
 
@@ -1598,7 +1610,7 @@ export default function BlicPayAdmin() {
                 </div>
               )}
 
-              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#E6F0FB', color: C.navy }}>
+              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
                 Chif sa yo pa gen ladan Prè — fonksyonalite a poko aktive.
               </div>
@@ -1616,7 +1628,7 @@ export default function BlicPayAdmin() {
             </div>
             <button onClick={() => setShowAgentForm((v) => !v)}
               className="bp-btn px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
-              style={{ background: `linear-gradient(135deg, ${C.navy}, ${C.sky})` }}>
+              style={{ background: C.navy }}>
               <UserPlus size={15} /> Nouvo ajan
             </button>
           </div>
@@ -1696,9 +1708,9 @@ export default function BlicPayAdmin() {
             position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 380,
             background: C.card, borderRadius: 16, zIndex: 53, padding: 24,
           }}>
-            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#FBF0DE' }}>
-              <AlertCircle size={16} color="#946115" className="shrink-0 mt-0.5" />
-              <p className="text-xs" style={{ color: '#946115' }}>
+            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#F3E8D2' }}>
+              <AlertCircle size={16} color="#8A6423" className="shrink-0 mt-0.5" />
+              <p className="text-xs" style={{ color: '#8A6423' }}>
                 Verifye peman an FINI e reyèlman rive nan kont ou anvan ou konfime — aksyon sa a p ap ka anile.
               </p>
             </div>
