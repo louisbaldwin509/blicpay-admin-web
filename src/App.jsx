@@ -1537,84 +1537,122 @@ export default function BlicPayAdmin() {
 
       {nav === 'finance' && (
         <div className="fadein">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Finans</h1>
-              <p className="text-sm mt-1.5" style={{ color: C.muted }}>Revni nèt BLICPay, detaye pa sous.</p>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: 4 }}>
-              {[
-                { id: 'day', label: 'Jodi a' },
-                { id: 'month', label: 'Mwa sa a' },
-                { id: 'year', label: 'Ane sa a' },
-                { id: 'all', label: 'Tout tan' },
-              ].map((p) => (
-                <button key={p.id} onClick={() => { setFinancePeriod(p.id); loadFinance(p.id); }}
-                  className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 14px',
-                    ...(financePeriod === p.id
-                      ? { background: C.navy, color: '#fff' }
-                      : { background: 'transparent', color: C.muted }),
-                  }}>
-                  {p.label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Finans</h1>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Revni nèt BLICPay, detaye pa sous.</p>
 
           {loadingFinance || !financeData ? (
             <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
           ) : (
-            <>
-              <div className="rounded-2xl relative overflow-hidden" style={{ marginTop: 28, padding: 28, background: `linear-gradient(135deg, ${C.navy}, ${C.navyDeep})`, boxShadow: '0 8px 20px rgba(15,45,82,0.25)' }}>
-                <div style={{ position: 'absolute', top: -50, right: -30, width: 160, height: 160, borderRadius: '50%', background: 'rgba(185,134,47,0.12)' }} />
-                <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.75)' }}>Revni nèt total</p>
-                <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 36, color: '#fff', marginTop: 4 }}>
-                  {money(financeData.total)}
-                </p>
+            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr]" style={{ gap: 32, marginTop: 28 }}>
+              {/* Kolòn goch: gwo chif la + seleksyon peryòd */}
+              <div>
+                <div className="rounded-2xl relative overflow-hidden" style={{ padding: '26px 22px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})`, boxShadow: '0 12px 28px rgba(15,45,82,0.22)' }}>
+                  <div style={{ position: 'absolute', bottom: -60, left: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(185,134,47,0.14)' }} />
+                  <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.7)' }}>Revni nèt total</p>
+                  <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 32, color: '#fff', marginTop: 6, lineHeight: 1.15 }}>
+                    {money(financeData.total)}
+                  </p>
+                </div>
+
+                <div className="flex flex-col" style={{ marginTop: 14, gap: 2 }}>
+                  {[
+                    { id: 'day', label: 'Jodi a' },
+                    { id: 'month', label: 'Mwa sa a' },
+                    { id: 'year', label: 'Ane sa a' },
+                    { id: 'all', label: 'Tout tan' },
+                  ].map((p) => (
+                    <button key={p.id} onClick={() => { setFinancePeriod(p.id); loadFinance(p.id); }}
+                      className="bp-btn text-left rounded-lg text-sm font-medium"
+                      style={{ padding: '9px 12px',
+                        background: financePeriod === p.id ? C.card : 'transparent',
+                        color: financePeriod === p.id ? C.navy : C.muted,
+                        borderLeft: financePeriod === p.id ? `2px solid ${C.gold}` : '2px solid transparent',
+                        boxShadow: financePeriod === p.id ? '0 1px 3px rgba(11,27,51,0.06)' : 'none',
+                      }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 32, marginBottom: 14 }}>Detay pa sous</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <StatCard label="Frè entegrasyon Sòl" value={money(financeData.breakdown.solIntegrationFees)} sub="1,5% sou pot total" accent={C.navy} />
-                <StatCard label="Penalite reta Sòl" value={money(financeData.breakdown.solPenalties)} sub="Kotizasyon an reta" accent="#8A6423" />
-                <StatCard label="Frè retrè" value={money(financeData.breakdown.withdrawalFees)} sub="1,25% sou lajan elektwonik" accent={C.mint} />
-              </div>
-
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 32, marginBottom: 14 }}>Detay pa siikisal</p>
-              {Object.keys(financeData.byBranch || {}).length === 0 ? (
-                <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
-                  Pa gen okenn tranzaksyon konfime pa yon ajan pandan peryòd sa a.
-                </p>
-              ) : (
-                <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.05)' }}>
-                  {Object.entries(financeData.byBranch).map(([branch, stats], i) => (
-                    <div key={branch} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
-                      style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                      <p className="text-sm font-semibold">{branch}</p>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right">
-                          <p className="text-xs" style={{ color: C.muted }}>Volim</p>
-                          <p className="text-sm font-semibold" style={{ ...fontMono }}>{money(stats.volume)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs" style={{ color: C.muted }}>Revni</p>
-                          <p className="text-sm font-semibold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs" style={{ color: C.muted }}>Tranzaksyon</p>
-                          <p className="text-sm font-semibold">{stats.count}</p>
+              {/* Kolòn dwat: releve detaye tankou yon liv kont */}
+              <div>
+                <p className="text-sm font-semibold" style={{ color: C.ink, marginBottom: 10 }}>Detay pa sous</p>
+                <div className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)' }}>
+                  {[
+                    { label: 'Frè entegrasyon Sòl', sub: '1,5% sou pot total', value: financeData.breakdown.solIntegrationFees, accent: C.navy },
+                    { label: 'Penalite reta Sòl', sub: 'Kotizasyon an reta', value: financeData.breakdown.solPenalties, accent: '#8A6423' },
+                    { label: 'Frè retrè', sub: '1,25% sou lajan elektwonik', value: financeData.breakdown.withdrawalFees, accent: C.mint },
+                  ].map((row, i) => (
+                    <div key={row.label} className="flex items-center justify-between" style={{ padding: '15px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                      <div className="flex items-center gap-3">
+                        <div style={{ width: 3, height: 30, borderRadius: 2, background: row.accent }} />
+                        <div>
+                          <p className="text-sm font-medium" style={{ color: C.ink }}>{row.label}</p>
+                          <p className="text-xs" style={{ color: C.muted }}>{row.sub}</p>
                         </div>
                       </div>
+                      <p className="text-sm font-semibold" style={{ ...fontMono, color: C.ink }}>{money(row.value)}</p>
                     </div>
                   ))}
                 </div>
-              )}
 
-              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
-                <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                Chif sa yo pa gen ladan Prè — fonksyonalite a poko aktive.
+                <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 28, marginBottom: 10 }}>Detay pa siikisal</p>
+                {Object.keys(financeData.byBranch || {}).length === 0 ? (
+                  <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
+                    Pa gen okenn siikisal kreye toujou.
+                  </p>
+                ) : (
+                  <div className="flex flex-col" style={{ gap: 12 }}>
+                    {Object.entries(financeData.byBranch).map(([branch, stats], i) => {
+                      const avgTx = stats.count > 0 ? Math.round(stats.volume / stats.count) : 0;
+                      return (
+                        <div key={branch} className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)', padding: '16px 20px' }}>
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5">
+                              {i === 0 && stats.fees > 0 && (
+                                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EFE7D8' }}>
+                                  <span style={{ fontSize: 12 }}>🏆</span>
+                                </div>
+                              )}
+                              <p className="text-sm font-semibold" style={{ color: C.ink }}>{branch}</p>
+                              <Badge tone="muted">{stats.agentCount} ajan</Badge>
+                            </div>
+                            <p className="text-base font-bold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: 14, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+                            <div>
+                              <p className="text-xs" style={{ color: C.muted }}>Depo</p>
+                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.depositVolume)}</p>
+                              <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} tranzaksyon</p>
+                            </div>
+                            <div>
+                              <p className="text-xs" style={{ color: C.muted }}>Retrè</p>
+                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.withdrawalVolume)}</p>
+                              <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} tranzaksyon</p>
+                            </div>
+                            <div>
+                              <p className="text-xs" style={{ color: C.muted }}>Volim total</p>
+                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.volume)}</p>
+                            </div>
+                            <div>
+                              <p className="text-xs" style={{ color: C.muted }}>Mwayèn pa tranzaksyon</p>
+                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(avgTx)}</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  Chif sa yo pa gen ladan Prè — fonksyonalite a poko aktive.
+                </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
@@ -1623,82 +1661,111 @@ export default function BlicPayAdmin() {
         <div className="fadein">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Ajan</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Kont ajan pou chak siikisal.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Ajan</h1>
+              <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Kont ajan pou chak siikisal.</p>
             </div>
-            <button onClick={() => setShowAgentForm((v) => !v)}
-              className="bp-btn px-4 py-2.5 rounded-lg text-sm font-semibold text-white flex items-center gap-2"
-              style={{ background: C.navy }}>
+            <button onClick={() => setShowAgentForm(true)}
+              className="bp-btn rounded-lg text-sm font-semibold text-white flex items-center gap-2"
+              style={{ padding: '10px 16px', background: C.navy }}>
               <UserPlus size={15} /> Nouvo ajan
             </button>
           </div>
 
-          <div className="mt-5 p-5 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-            <p className="text-sm font-semibold" style={{ color: C.muted }}>Siikisal yo</p>
-            <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-              {branches.map((b) => (
-                <Badge key={b.id} tone="navy">{b.name}</Badge>
-              ))}
-              {branches.length === 0 && !loadingBranches && (
-                <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn siikisal kreye toujou.</p>
-              )}
-            </div>
-            <div className="mt-3 flex gap-2">
+          <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 22 }}>
+            <span className="text-xs font-medium" style={{ color: C.muted }}>Siikisal:</span>
+            {branches.map((b) => (
+              <Badge key={b.id} tone="navy">{b.name}</Badge>
+            ))}
+            <div className="flex items-center" style={{ marginLeft: 6 }}>
               <input value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)}
-                placeholder="Non nouvo siikisal la (egzanp: Cap-Haïtien)"
-                className="flex-1 px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Ajoute yon siikisal..."
+                style={{ padding: '6px 10px', fontSize: 12.5, borderRadius: '8px 0 0 8px', border: `1px solid ${C.border}`, borderRight: 'none', width: 160 }} />
               <button onClick={createBranch} disabled={creatingBranch}
-                className="bp-btn px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
-                style={{ background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
-                {creatingBranch ? 'Ap ajoute...' : 'Ajoute'}
+                className="bp-btn text-xs font-semibold"
+                style={{ padding: '6.5px 12px', borderRadius: '0 8px 8px 0', background: C.bg, border: `1px solid ${C.border}`, color: C.navy, opacity: creatingBranch ? 0.6 : 1 }}>
+                +
               </button>
             </div>
           </div>
 
-          {showAgentForm && (
-            <div className="mt-5 p-5 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <input value={agentForm.fullName} onChange={(e) => setAgentForm((f) => ({ ...f, fullName: e.target.value }))}
-                  placeholder="Non konplè" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
-                <input value={agentForm.phone} onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
-                  placeholder="Nimewo telefòn" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
-                <input type="password" value={agentForm.password} onChange={(e) => setAgentForm((f) => ({ ...f, password: e.target.value }))}
-                  placeholder="Modpas (6+ karaktè)" className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
-                <select value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
-                  className="px-3.5 py-2.5 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
-                  <option value="">Chwazi siikisal...</option>
-                  {branches.map((b) => (
-                    <option key={b.id} value={b.name}>{b.name}</option>
-                  ))}
-                </select>
-              </div>
-              <button onClick={createAgent} disabled={creatingAgent}
-                className="bp-btn mt-4 px-4 py-2.5 rounded-lg text-sm font-semibold text-white"
-                style={{ background: C.mint, opacity: creatingAgent ? 0.7 : 1 }}>
-                {creatingAgent ? 'Ap kreye...' : 'Kreye kont ajan an'}
-              </button>
-            </div>
-          )}
-
           {loadingAgents ? (
-            <p className="text-sm mt-8 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+            <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
           ) : agents.length === 0 ? (
-            <p className="text-sm mt-8 text-center" style={{ color: C.muted }}>Pa gen okenn ajan kreye toujou.</p>
+            <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 24, marginTop: 24, textAlign: 'center' }}>
+              Pa gen okenn ajan kreye toujou.
+            </p>
           ) : (
-            <div className="mt-5 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
-              {agents.map((a, i) => (
-                <div key={a.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
-                  style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                  <div>
-                    <p className="text-sm font-semibold">{a.fullName}</p>
-                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>{a.phone} · {new Date(a.createdAt).toLocaleDateString('fr-FR')}</p>
-                  </div>
-                  <Badge tone={a.blocked ? 'danger' : 'navy'}>{a.branch}</Badge>
-                </div>
-              ))}
+            <div style={{ marginTop: 28 }}>
+              {branches
+                .map((b) => b.name)
+                .concat(agents.some((a) => !branches.find((b) => b.name === a.branch)) ? ['Lòt'] : [])
+                .map((branchName) => {
+                  const branchAgents = agents.filter((a) => (a.branch === branchName) || (branchName === 'Lòt' && !branches.find((b) => b.name === a.branch)));
+                  if (branchAgents.length === 0) return null;
+                  return (
+                    <div key={branchName} style={{ marginBottom: 22 }}>
+                      <p className="text-xs font-semibold" style={{ color: C.muted, marginBottom: 8 }}>{branchName}</p>
+                      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)' }}>
+                        {branchAgents.map((a, i) => (
+                          <div key={a.id} className="flex items-center justify-between flex-wrap gap-3"
+                            style={{ padding: '14px 18px', background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.bg, color: C.navy, fontSize: 12, fontWeight: 700 }}>
+                                {initials(a.fullName)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium">{a.fullName}</p>
+                                <p className="text-xs" style={{ color: C.muted }}>{a.phone}</p>
+                              </div>
+                            </div>
+                            <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? 'Bloke' : 'Aktif'}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           )}
         </div>
+      )}
+
+      {showAgentForm && (
+        <>
+          <div onClick={() => setShowAgentForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
+          <div className="fadein" style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 420,
+            background: C.card, borderRadius: 16, zIndex: 53, padding: 26,
+          }}>
+            <p className="text-sm font-semibold" style={{ color: C.ink }}>Nouvo kont ajan</p>
+            <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>Kont sa a ka konfime depo/retrè pou siikisal li.</p>
+            <div className="flex flex-col" style={{ gap: 10 }}>
+              <input value={agentForm.fullName} onChange={(e) => setAgentForm((f) => ({ ...f, fullName: e.target.value }))}
+                placeholder="Non konplè" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input value={agentForm.phone} onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="Nimewo telefòn" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input type="password" value={agentForm.password} onChange={(e) => setAgentForm((f) => ({ ...f, password: e.target.value }))}
+                placeholder="Modpas (6+ karaktè)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <select value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
+                className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }}>
+                <option value="">Chwazi siikisal...</option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2.5" style={{ marginTop: 20 }}>
+              <button onClick={() => setShowAgentForm(false)}
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '11px', background: C.bg, color: C.muted }}>
+                Anile
+              </button>
+              <button onClick={createAgent} disabled={creatingAgent}
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingAgent ? 0.7 : 1 }}>
+                {creatingAgent ? 'Ap kreye...' : 'Kreye kont lan'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {confirmingDeposit && (
