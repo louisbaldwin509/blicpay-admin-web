@@ -180,6 +180,9 @@ export default function BlicPayAdmin() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [viewingReceipt, setViewingReceipt] = useState(null);
   const [confirmingDeposit, setConfirmingDeposit] = useState(null);
+  const [confirmingWithdrawal, setConfirmingWithdrawal] = useState(null);
+  const [withdrawalProofFile, setWithdrawalProofFile] = useState(null);
+  const [confirmingWithdrawalBusy, setConfirmingWithdrawalBusy] = useState(false);
   const [financeData, setFinanceData] = useState(null);
   const [financePeriod, setFinancePeriod] = useState('month');
   const [loadingFinance, setLoadingFinance] = useState(false);
@@ -223,6 +226,7 @@ export default function BlicPayAdmin() {
       setWithdrawals(ws.map((w) => ({
         id: w.id, user: w.user.fullName, phone: w.user.phone, method: w.method,
         amount: w.amount, reference: w.reference, date: new Date(w.createdAt).toLocaleString('fr-FR'),
+        destinationNumber: w.destinationNumber, branch: w.branch, clientId: w.user.clientId,
       })));
     } catch (err) { flash(err.message); } finally { setLoadingWithdrawals(false); }
   }
@@ -528,9 +532,19 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); }
   }
 
-  async function confirmWithdrawal(id) {
+  async function confirmWithdrawal(id, proofFile) {
     try {
-      await apiFetch(`/admin/withdrawals/${id}/confirm`, { method: 'POST', token });
+      let body = {};
+      if (proofFile) {
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = () => reject(new Error('Nou pa t ka li foto a.'));
+          reader.readAsDataURL(proofFile);
+        });
+        body = { proofImage: base64, proofMimeType: proofFile.type };
+      }
+      await apiFetch(`/admin/withdrawals/${id}/confirm`, { method: 'POST', token, body });
       setWithdrawals((w) => w.filter((x) => x.id !== id));
       flash('Retrè konfime.');
     } catch (err) { flash(err.message); }
@@ -890,6 +904,14 @@ export default function BlicPayAdmin() {
                           <p className="text-sm font-semibold">{w.user}</p>
                           <p className="text-xs mt-0.5" style={{ color: C.muted }}>{w.phone} · {w.date}</p>
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{w.reference}</p>
+                          {w.destinationNumber && (
+                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>→ {w.destinationNumber}</p>
+                          )}
+                          {w.method === 'biwo' && (
+                            <p className="text-xs mt-0.5" style={{ color: C.navy }}>
+                              {w.branch} · Kòd: <span style={{ ...fontMono, fontWeight: 700 }}>{w.clientId}</span>
+                            </p>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
@@ -903,7 +925,7 @@ export default function BlicPayAdmin() {
                             style={{ border: `1px solid ${C.border}` }} aria-label="Rejte">
                             <X size={15} color={C.danger} />
                           </button>
-                          <button onClick={() => confirmWithdrawal(w.id)}
+                          <button onClick={() => { setConfirmingWithdrawal(w); setWithdrawalProofFile(null); }}
                             className="bp-btn px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
                             style={{ background: C.mint, color: '#fff' }}>
                             <Check size={13} /> Konfime
@@ -1762,6 +1784,57 @@ export default function BlicPayAdmin() {
               <button onClick={createAgent} disabled={creatingAgent}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingAgent ? 0.7 : 1 }}>
                 {creatingAgent ? 'Ap kreye...' : 'Kreye kont lan'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {confirmingWithdrawal && (
+        <>
+          <div onClick={() => setConfirmingWithdrawal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 52 }} />
+          <div className="fadein" style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 400,
+            background: C.card, borderRadius: 16, zIndex: 53, padding: 24,
+          }}>
+            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#F3E8D2' }}>
+              <AlertCircle size={16} color="#8A6423" className="shrink-0 mt-0.5" />
+              <p className="text-xs" style={{ color: '#8A6423' }}>
+                Verifye ou VOYE lajan an anvan ou konfime — aksyon sa a p ap ka anile.
+              </p>
+            </div>
+            <p className="text-sm font-semibold">Konfime retrè {confirmingWithdrawal.user}?</p>
+            <p className="text-xs mt-1" style={{ color: C.muted }}>
+              {money(confirmingWithdrawal.amount)} · {methodIcons[confirmingWithdrawal.method]?.label || confirmingWithdrawal.method}
+            </p>
+            {confirmingWithdrawal.destinationNumber && (
+              <p className="text-sm mt-2 font-semibold" style={{ ...fontMono, color: C.navy }}>→ {confirmingWithdrawal.destinationNumber}</p>
+            )}
+            {confirmingWithdrawal.method === 'biwo' && (
+              <p className="text-sm mt-2" style={{ color: C.navy }}>
+                {confirmingWithdrawal.branch} · Kòd kliyan: <span style={{ ...fontMono, fontWeight: 700 }}>{confirmingWithdrawal.clientId}</span>
+              </p>
+            )}
+
+            <label className="block mt-4 text-xs font-semibold" style={{ color: C.muted }}>PRÈV OU VOYE LAJAN AN (opsyonèl)</label>
+            <input type="file" accept="image/*" onChange={(e) => setWithdrawalProofFile(e.target.files?.[0] || null)}
+              className="w-full mt-1.5 text-xs" />
+
+            <div className="flex gap-2.5 mt-5">
+              <button onClick={() => setConfirmingWithdrawal(null)}
+                className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: C.bg, color: C.muted }}>
+                Anile
+              </button>
+              <button
+                onClick={async () => {
+                  setConfirmingWithdrawalBusy(true);
+                  await confirmWithdrawal(confirmingWithdrawal.id, withdrawalProofFile);
+                  setConfirmingWithdrawalBusy(false);
+                  setConfirmingWithdrawal(null);
+                }}
+                disabled={confirmingWithdrawalBusy}
+                className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint, opacity: confirmingWithdrawalBusy ? 0.7 : 1 }}>
+                {confirmingWithdrawalBusy ? 'Ap konfime...' : 'Wi, konfime li'}
               </button>
             </div>
           </div>
