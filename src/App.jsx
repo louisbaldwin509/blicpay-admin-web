@@ -702,6 +702,7 @@ export default function BlicPayAdmin() {
 
   const NAV_ITEMS_ALL = [
     { id: 'overview', label: 'Apèsi', icon: LayoutGrid, adminOnly: true },
+    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: true },
     { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
     { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => loadWithdrawals() },
     { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
@@ -713,7 +714,6 @@ export default function BlicPayAdmin() {
     { id: 'support', label: 'Mesaj Sipò', icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
     { id: 'users', label: 'Itilizatè', icon: User, onOpen: () => loadUsers(), adminOnly: true },
     { id: 'agents', label: 'Ajan', icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
-    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: true },
   ];
   const NAV_ITEMS = NAV_ITEMS_ALL.filter((item) => !item.adminOnly || admin?.role === 'admin');
 
@@ -1821,121 +1821,217 @@ export default function BlicPayAdmin() {
       {nav === 'finance' && (
         <div className="fadein">
           <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Finans</h1>
-          <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Revni nèt BLICPay, detaye pa sous.</p>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Vi jeneral sou volim ak revni BLICPay — detaye pa sous ak pa siikisal.</p>
 
           {loadingFinance || !financeData ? (
             <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr]" style={{ gap: 32, marginTop: 28 }}>
-              {/* Kolòn goch: gwo chif la + seleksyon peryòd */}
-              <div>
-                <div className="rounded-2xl relative overflow-hidden" style={{ padding: '26px 22px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})`, boxShadow: '0 12px 28px rgba(15,45,82,0.22)' }}>
-                  <div style={{ position: 'absolute', bottom: -60, left: -40, width: 160, height: 160, borderRadius: '50%', background: 'rgba(185,134,47,0.14)' }} />
+            <>
+              <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 20 }}>
+                {[
+                  { id: 'day', label: 'Jodi a' },
+                  { id: 'week', label: 'Semèn nan' },
+                  { id: 'month', label: 'Mwa sa a' },
+                  { id: 'year', label: 'Ane sa a' },
+                  { id: 'all', label: 'Tout tan' },
+                ].map((p) => (
+                  <button key={p.id} onClick={() => { setFinancePeriod(p.id); loadFinance(p.id); }}
+                    className="bp-btn rounded-lg text-sm font-medium"
+                    style={{ padding: '8px 14px',
+                      background: financePeriod === p.id ? C.navy : C.card,
+                      color: financePeriod === p.id ? '#fff' : C.muted,
+                      border: `1px solid ${financePeriod === p.id ? C.navy : C.border}`,
+                    }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* KPI yo — vi jeneral an yon kout je */}
+              <div className="grid grid-cols-2 lg:grid-cols-5" style={{ gap: 12, marginTop: 18 }}>
+                <div className="rounded-2xl relative overflow-hidden" style={{ padding: '18px 20px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})` }}>
+                  <div style={{ position: 'absolute', bottom: -50, left: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(185,134,47,0.14)' }} />
                   <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.7)' }}>Revni nèt total</p>
-                  <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 32, color: '#fff', marginTop: 6, lineHeight: 1.15 }}>
-                    {money(financeData.total)}
+                  <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 22, color: '#fff', marginTop: 4 }}>{money(financeData.total)}</p>
+                </div>
+                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs" style={{ color: C.muted }}>Volim depo</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.ink, marginTop: 4 }}>{money(financeData.totalDepositVolume)}</p>
+                </div>
+                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs" style={{ color: C.muted }}>Volim retrè</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.ink, marginTop: 4 }}>{money(financeData.totalWithdrawalVolume)}</p>
+                </div>
+                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs" style={{ color: C.muted }}>Volim Sòl aktif</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.gold, marginTop: 4 }}>
+                    {money((financeData.solGroups || []).reduce((s, g) => s + g.potential, 0))}
                   </p>
                 </div>
-
-                <div className="flex flex-col" style={{ marginTop: 14, gap: 2 }}>
-                  {[
-                    { id: 'day', label: 'Jodi a' },
-                    { id: 'month', label: 'Mwa sa a' },
-                    { id: 'year', label: 'Ane sa a' },
-                    { id: 'all', label: 'Tout tan' },
-                  ].map((p) => (
-                    <button key={p.id} onClick={() => { setFinancePeriod(p.id); loadFinance(p.id); }}
-                      className="bp-btn text-left rounded-lg text-sm font-medium"
-                      style={{ padding: '9px 12px',
-                        background: financePeriod === p.id ? C.card : 'transparent',
-                        color: financePeriod === p.id ? C.navy : C.muted,
-                        borderLeft: financePeriod === p.id ? `2px solid ${C.gold}` : '2px solid transparent',
-                        boxShadow: financePeriod === p.id ? '0 1px 3px rgba(11,27,51,0.06)' : 'none',
-                      }}>
-                      {p.label}
-                    </button>
-                  ))}
+                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs" style={{ color: C.muted }}>Kliyan sèvi</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.mint, marginTop: 4 }}>{financeData.totalUniqueClients || 0}</p>
                 </div>
               </div>
 
-              {/* Kolòn dwat: releve detaye tankou yon liv kont */}
-              <div>
-                <p className="text-sm font-semibold" style={{ color: C.ink, marginBottom: 10 }}>Detay pa sous</p>
-                <div className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)' }}>
-                  {[
-                    { label: 'Frè entegrasyon Sòl', sub: '1,5% sou pot total', value: financeData.breakdown.solIntegrationFees, accent: C.navy },
-                    { label: 'Penalite reta Sòl', sub: 'Kotizasyon an reta', value: financeData.breakdown.solPenalties, accent: '#8A6423' },
-                    { label: 'Frè retrè', sub: '1,25% sou lajan elektwonik', value: financeData.breakdown.withdrawalFees, accent: C.mint },
-                  ].map((row, i) => (
-                    <div key={row.label} className="flex items-center justify-between" style={{ padding: '15px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                      <div className="flex items-center gap-3">
-                        <div style={{ width: 3, height: 30, borderRadius: 2, background: row.accent }} />
-                        <div>
-                          <p className="text-sm font-medium" style={{ color: C.ink }}>{row.label}</p>
-                          <p className="text-xs" style={{ color: C.muted }}>{row.sub}</p>
+              {/* Grafik volim jou pa jou */}
+              {financeData.dailyVolume && financeData.dailyVolume.length > 0 && (
+                <div className="rounded-2xl" style={{ marginTop: 20, padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="flex items-center justify-between flex-wrap gap-2" style={{ marginBottom: 14 }}>
+                    <p className="text-sm font-semibold" style={{ color: C.ink }}>Volim jou pa jou</p>
+                    <div className="flex items-center gap-3 text-xs" style={{ color: C.muted }}>
+                      <span><span style={{ display: 'inline-block', width: 9, height: 9, background: C.navy, borderRadius: 2, marginRight: 5 }} />Depo</span>
+                      <span><span style={{ display: 'inline-block', width: 9, height: 9, background: C.gold, borderRadius: 2, marginRight: 5 }} />Retrè</span>
+                    </div>
+                  </div>
+                  {(() => {
+                    const maxVal = Math.max(1, ...financeData.dailyVolume.map((d) => Math.max(d.deposits, d.withdrawals)));
+                    return (
+                      <div className="flex items-end" style={{ gap: 10, height: 130, overflowX: 'auto' }}>
+                        {financeData.dailyVolume.map((d) => (
+                          <div key={d.date} className="flex flex-col items-center justify-end" style={{ gap: 5, minWidth: 22, height: '100%' }}>
+                            <div className="flex items-end" style={{ gap: 3, height: 100 }}>
+                              <div style={{ width: 9, height: Math.round((d.deposits / maxVal) * 100), background: C.navy, borderRadius: '2px 2px 0 0' }} />
+                              <div style={{ width: 9, height: Math.round((d.withdrawals / maxVal) * 100), background: C.gold, borderRadius: '2px 2px 0 0' }} />
+                            </div>
+                            <span style={{ fontSize: 9, color: C.muted }}>{new Date(d.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Pwodwi 100% dijital — pa gen siikisal ki enplike */}
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Pwodwi dijital (tout kliyan, san siikisal)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12 }}>
+                <div className="rounded-xl" style={{ padding: 16, background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>BLIC DEPO</p>
+                  <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.pockets.totalBalance)}</p>
+                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.pockets.activeCount} pòch aktif</p>
+                </div>
+                <div className="rounded-xl" style={{ padding: 16, background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>DEPO AK OBJEKTIF</p>
+                  <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.goals.totalSaved)}</p>
+                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.goals.activeCount} aktif · {financeData.digitalProducts.goals.completedCount} rive</p>
+                </div>
+                <div className="rounded-xl" style={{ padding: 16, background: C.card, border: `1px solid ${C.border}` }}>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>PRÈ</p>
+                  <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.loans.totalOutstanding)}</p>
+                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.loans.activeCount} prè aktif</p>
+                </div>
+              </div>
+
+              {/* Volim pa gwoup Sòl */}
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Volim pa gwoup Sòl</p>
+              {(!financeData.solGroups || financeData.solGroups.length === 0) ? (
+                <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
+                  Pa gen okenn gwoup Sòl ak manm apwouve toujou.
+                </p>
+              ) : (
+                <div className="flex flex-col" style={{ gap: 10 }}>
+                  {financeData.solGroups.map((g) => {
+                    const pct = g.potential > 0 ? Math.round((g.collected / g.potential) * 100) : 0;
+                    return (
+                      <div key={g.name} className="rounded-xl" style={{ padding: '14px 18px', background: C.card, border: `1px solid ${C.border}` }}>
+                        <div className="flex items-center justify-between flex-wrap gap-2" style={{ marginBottom: 8 }}>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-semibold" style={{ color: C.ink }}>{g.name}</p>
+                            <Badge tone="muted">{g.memberCount}/{g.maxMembers} manm</Badge>
+                          </div>
+                          <p className="text-xs font-semibold" style={{ ...fontMono, color: C.muted }}>{money(g.collected)} / {money(g.potential)}</p>
+                        </div>
+                        <div className="rounded-full overflow-hidden" style={{ height: 6, background: '#F0EDE4' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: C.mint }} />
                         </div>
                       </div>
-                      <p className="text-sm font-semibold" style={{ ...fontMono, color: C.ink }}>{money(row.value)}</p>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
+              )}
 
-                <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 28, marginBottom: 10 }}>Detay pa siikisal</p>
-                {Object.keys(financeData.byBranch || {}).length === 0 ? (
-                  <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
-                    Pa gen okenn siikisal kreye toujou.
-                  </p>
-                ) : (
-                  <div className="flex flex-col" style={{ gap: 12 }}>
-                    {Object.entries(financeData.byBranch).map(([branch, stats], i) => {
-                      const avgTx = stats.count > 0 ? Math.round(stats.volume / stats.count) : 0;
-                      return (
-                        <div key={branch} className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)', padding: '16px 20px' }}>
-                          <div className="flex items-center justify-between flex-wrap gap-2">
-                            <div className="flex items-center gap-2.5">
-                              {i === 0 && stats.fees > 0 && (
-                                <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EFE7D8' }}>
-                                  <span style={{ fontSize: 12 }}>🏆</span>
-                                </div>
-                              )}
-                              <p className="text-sm font-semibold" style={{ color: C.ink }}>{branch}</p>
-                              <Badge tone="muted">{stats.agentCount} ajan</Badge>
-                            </div>
-                            <p className="text-base font-bold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
+              {/* Revni pa sous (egzistan deja) */}
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Revni pa sous</p>
+              <div className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)' }}>
+                {[
+                  { label: 'Frè entegrasyon Sòl', sub: '1,5% sou pot total', value: financeData.breakdown.solIntegrationFees, accent: C.navy },
+                  { label: 'Penalite reta Sòl', sub: 'Kotizasyon an reta', value: financeData.breakdown.solPenalties, accent: '#8A6423' },
+                  { label: 'Frè retrè', sub: '1,25% sou lajan elektwonik', value: financeData.breakdown.withdrawalFees, accent: C.mint },
+                ].map((row, i) => (
+                  <div key={row.label} className="flex items-center justify-between" style={{ padding: '15px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                    <div className="flex items-center gap-3">
+                      <div style={{ width: 3, height: 30, borderRadius: 2, background: row.accent }} />
+                      <div>
+                        <p className="text-sm font-medium" style={{ color: C.ink }}>{row.label}</p>
+                        <p className="text-xs" style={{ color: C.muted }}>{row.sub}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-semibold" style={{ ...fontMono, color: C.ink }}>{money(row.value)}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Detay pa siikisal — kounye a ak kliyan sèvi */}
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Detay pa siikisal</p>
+              {Object.keys(financeData.byBranch || {}).length === 0 ? (
+                <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
+                  Pa gen okenn siikisal kreye toujou.
+                </p>
+              ) : (
+                <div className="flex flex-col" style={{ gap: 12 }}>
+                  {Object.entries(financeData.byBranch).map(([branch, stats], i) => {
+                    const avgTx = stats.count > 0 ? Math.round(stats.volume / stats.count) : 0;
+                    return (
+                      <div key={branch} className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)', padding: '16px 20px' }}>
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center gap-2.5">
+                            {i === 0 && stats.fees > 0 && (
+                              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EFE7D8' }}>
+                                <span style={{ fontSize: 12 }}>🏆</span>
+                              </div>
+                            )}
+                            <p className="text-sm font-semibold" style={{ color: C.ink }}>{branch}</p>
+                            <Badge tone="muted">{stats.agentCount} ajan</Badge>
                           </div>
+                          <p className="text-base font-bold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
+                        </div>
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4" style={{ gap: 14, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-                            <div>
-                              <p className="text-xs" style={{ color: C.muted }}>Depo</p>
-                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.depositVolume)}</p>
-                              <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} tranzaksyon</p>
-                            </div>
-                            <div>
-                              <p className="text-xs" style={{ color: C.muted }}>Retrè</p>
-                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.withdrawalVolume)}</p>
-                              <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} tranzaksyon</p>
-                            </div>
-                            <div>
-                              <p className="text-xs" style={{ color: C.muted }}>Volim total</p>
-                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.volume)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs" style={{ color: C.muted }}>Mwayèn pa tranzaksyon</p>
-                              <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(avgTx)}</p>
-                            </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-5" style={{ gap: 14, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
+                          <div>
+                            <p className="text-xs" style={{ color: C.muted }}>Depo</p>
+                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.depositVolume)}</p>
+                            <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} tranzaksyon</p>
+                          </div>
+                          <div>
+                            <p className="text-xs" style={{ color: C.muted }}>Retrè</p>
+                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.withdrawalVolume)}</p>
+                            <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} tranzaksyon</p>
+                          </div>
+                          <div>
+                            <p className="text-xs" style={{ color: C.muted }}>Volim total</p>
+                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.volume)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs" style={{ color: C.muted }}>Mwayèn pa tranzaksyon</p>
+                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(avgTx)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs" style={{ color: C.muted }}>Kliyan sèvi</p>
+                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{stats.uniqueClients || 0}</p>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-
-                <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
-                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                  Chif sa yo pa gen ladan Prè — fonksyonalite a poko aktive.
+                      </div>
+                    );
+                  })}
                 </div>
+              )}
+
+              <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                Kat "Kliyan sèvi" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Kolòn "Kliyan sèvi" nan chak siikisal pi ba a konte sèlman sa yon AJAN konfime pandan peryòd la.
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
