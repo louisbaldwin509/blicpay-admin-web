@@ -457,6 +457,32 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); } finally { setLoadingBranches(false); }
   }
 
+  async function toggleAgentBlock(a) {
+    try {
+      await apiFetch(`/admin/users/${a.id}/block`, { method: 'PATCH', token, body: { blocked: !a.blocked } });
+      setAgents((ags) => ags.map((x) => x.id === a.id ? { ...x, blocked: !a.blocked } : x));
+      flash(!a.blocked ? 'Ajan bloke.' : 'Ajan debloke.');
+    } catch (err) { flash(err.message); }
+  }
+
+  async function deleteAgent(a) {
+    if (!window.confirm(`Efase kont ajan ${a.fullName} nèt? Aksyon sa a pa ka anile.`)) return;
+    try {
+      await apiFetch(`/admin/agents/${a.id}`, { method: 'DELETE', token });
+      setAgents((ags) => ags.filter((x) => x.id !== a.id));
+      flash('Ajan efase.');
+    } catch (err) { flash(err.message); }
+  }
+
+  async function deleteBranch(b) {
+    if (!window.confirm(`Efase siikisal "${b.name}" nèt? Aksyon sa a pa ka anile.`)) return;
+    try {
+      await apiFetch(`/admin/branches/${b.id}`, { method: 'DELETE', token });
+      setBranches((brs) => brs.filter((x) => x.id !== b.id));
+      flash('Siikisal la efase.');
+    } catch (err) { flash(err.message); }
+  }
+
   async function createBranch() {
     if (!branchForm.name.trim()) {
       flash('Antre non siikisal la.');
@@ -891,8 +917,8 @@ export default function BlicPayAdmin() {
                     <div key={d.id} className="flex items-center justify-between px-4 py-3.5"
                       style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: M.color }}>
-                          <M.icon size={15} color="#fff" />
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                          {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={15} color="#fff" />}
                         </div>
                         <div>
                           <p className="text-sm font-medium">{d.user}</p>
@@ -2069,8 +2095,12 @@ export default function BlicPayAdmin() {
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 22 }}>
             <span className="text-xs font-medium" style={{ color: C.muted }}>Siikisal:</span>
             {branches.map((b) => (
-              <span key={b.id} title={b.code} className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: '#EFE7D8', color: C.navy }}>
+              <span key={b.id} title={b.code} className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold" style={{ background: '#EFE7D8', color: C.navy }}>
                 {b.name} <span style={{ ...fontMono, opacity: 0.65, fontSize: 10.5 }}>{b.code}</span>
+                <button onClick={() => deleteBranch(b)} title="Efase siikisal la" aria-label="Efase siikisal la"
+                  className="bp-btn w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(11,27,51,0.12)' }}>
+                  <X size={9} color={C.navy} />
+                </button>
               </span>
             ))}
             <button onClick={() => setShowBranchForm(true)}
@@ -2115,7 +2145,17 @@ export default function BlicPayAdmin() {
                                 <p className="text-xs" style={{ color: C.muted }}>{a.phone}{a.employeeCode ? ` · ${a.employeeCode}` : ''}</p>
                               </div>
                             </div>
-                            <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? 'Bloke' : 'Aktif'}</Badge>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? 'Bloke' : 'Aktif'}</Badge>
+                              <button onClick={() => toggleAgentBlock(a)} title={a.blocked ? 'Debloke' : 'Bloke'}
+                                className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
+                                <Lock size={12} color={C.muted} />
+                              </button>
+                              <button onClick={() => deleteAgent(a)} title="Efase"
+                                className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FBEBE6' }}>
+                                <X size={12} color={C.danger} />
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
