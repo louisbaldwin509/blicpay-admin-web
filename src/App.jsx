@@ -134,13 +134,11 @@ export default function BlicPayAdmin() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [nav, setNav] = useState('overview');
-  const mainScrollRef = React.useRef(null);
 
-  // Retabli defilman kontni prensipal la an wo chak fwa n chanje onglè —
-  // san sa, si w te desann nan yon lòt seksyon anvan, nouvo seksyon an
-  // parèt deja desann tou. Meni a rete fikse, li pa defile ditou kounye a.
+  // Retounen anlè paj la chak fwa n chanje onglè — meni an rete vizib
+  // (li fikse anlè), se sèlman kontni anba a ki bezwen remonte.
   React.useEffect(() => {
-    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   }, [nav]);
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState('');
@@ -800,61 +798,55 @@ export default function BlicPayAdmin() {
         </div>
       )}
 
-      <div className="flex" style={{ height: '100vh' }}>
-        {/* sidebar — fikse, li pa dwe defile ak rès kontni an */}
-        <div className="w-56 shrink-0 hidden md:flex flex-col" style={{ background: C.navyDeep, padding: '28px 18px', height: '100%', overflowY: 'auto' }}>
-          <div className="flex items-center gap-2 px-2" style={{ marginBottom: 40 }}>
-            <Logo size={26} />
+      {/* barre navigasyon anlè — fikse, li rete vizib pandan kontni an defile */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep }}>
+        <div className="flex items-center justify-between" style={{ padding: '16px 24px 14px' }}>
+          <div className="flex items-center gap-2">
+            <Logo size={24} />
             <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15, color: '#fff' }}>
               BLIC<span style={{ color: C.gold }}>Pay</span>
             </span>
           </div>
-          {NAV_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => goTo(item)}
-              className="nav-item w-full flex items-center gap-2.5 rounded-lg text-sm font-medium"
-              style={{
-                padding: '10px 12px', marginBottom: 2,
-                background: nav === item.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: nav === item.id ? '#fff' : 'rgba(255,255,255,0.55)',
-                borderLeft: nav === item.id ? `2px solid ${C.gold}` : '2px solid transparent',
-              }}>
-              <item.icon size={16} />
-              <span className="flex-1 text-left">{item.label}</span>
-              {item.count > 0 && <Badge tone="danger">{item.count}</Badge>}
-            </button>
-          ))}
-          <div className="mt-auto" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 14, marginTop: 14 }}>
-            <button onClick={logout}
-              className="w-full flex items-center gap-2.5 rounded-lg text-sm font-medium"
-              style={{ padding: '10px 12px', color: 'rgba(255,255,255,0.5)' }}>
-              <LogOut size={16} /> Dekonekte
-            </button>
-          </div>
-        </div>
-
-        {/* main */}
-        <div ref={mainScrollRef} className="flex-1" style={{ padding: '36px 44px', maxWidth: 1180, width: '100%', height: '100%', overflowY: 'auto' }}>
-          <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
-            <div className="flex items-center gap-2 md:hidden">
-              <Logo size={24} />
-              <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15 }}>BLICPay Admin</span>
-            </div>
-            <div className="hidden md:flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: C.navy }}>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 700 }}>{initials(admin?.fullName || '')}</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
+                <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{initials(admin?.fullName || '')}</span>
               </div>
               <div>
-                <p className="text-sm font-semibold" style={{ lineHeight: 1.2 }}>{admin?.fullName}</p>
-                <p className="text-xs" style={{ color: C.muted, lineHeight: 1.2 }}>
+                <p className="text-sm font-semibold" style={{ color: '#fff', lineHeight: 1.2 }}>{admin?.fullName}</p>
+                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.2 }}>
                   {admin?.role === 'agent' ? `Ajan · ${admin?.branch}` : 'Sipè admin'}
                 </p>
               </div>
             </div>
-            <button className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 2px rgba(11,27,51,0.06)' }}>
-              <Bell size={16} color={C.muted} />
+            <button className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <Bell size={15} color="#fff" />
+            </button>
+            <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label="Dekonekte">
+              <LogOut size={15} color="#fff" />
             </button>
           </div>
+        </div>
+        <div className="flex items-center flex-wrap" style={{ padding: '0 20px 10px', gap: 2 }}>
+          {NAV_ITEMS.map((item) => (
+            <button key={item.id} onClick={() => goTo(item)}
+              className="nav-item flex items-center gap-2 rounded-lg text-sm font-medium"
+              style={{
+                padding: '8px 12px',
+                background: nav === item.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                color: nav === item.id ? '#fff' : 'rgba(255,255,255,0.55)',
+                borderBottom: nav === item.id ? `2px solid ${C.gold}` : '2px solid transparent',
+              }}>
+              <item.icon size={15} />
+              <span>{item.label}</span>
+              {item.count > 0 && <Badge tone="danger">{item.count}</Badge>}
+            </button>
+          ))}
+        </div>
+      </div>
 
+      {/* kontni — pran tout lajè a kounye a */}
+      <div style={{ padding: '32px 40px', maxWidth: 1440, width: '100%', margin: '0 auto' }}>
           {nav === 'overview' && (
             <div className="fadein">
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Apèsi</h1>
@@ -1618,7 +1610,6 @@ export default function BlicPayAdmin() {
             </div>
           )}
         </div>
-      </div>
 
       {/* Sol group members + payout dates drawer */}
       {selectedSolGroup && (
@@ -2068,10 +2059,10 @@ export default function BlicPayAdmin() {
                   return (
                     <div key={branchName} style={{ marginBottom: 22 }}>
                       <p className="text-xs font-semibold" style={{ color: C.muted, marginBottom: 8 }}>{branchName}</p>
-                      <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)' }}>
-                        {branchAgents.map((a, i) => (
-                          <div key={a.id} className="flex items-center justify-between flex-wrap gap-3"
-                            style={{ padding: '14px 18px', background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 10 }}>
+                        {branchAgents.map((a) => (
+                          <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl"
+                            style={{ padding: '14px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.bg, color: C.navy, fontSize: 12, fontWeight: 700 }}>
                                 {initials(a.fullName)}
