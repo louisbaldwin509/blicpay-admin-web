@@ -134,11 +134,13 @@ export default function BlicPayAdmin() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [nav, setNav] = useState('overview');
+  const mainScrollRef = React.useRef(null);
 
-  // Retounen anlè paj la chak fwa n chanje onglè — san sa, si w te desann
-  // nan yon lòt seksyon anvan, nouvo seksyon an parèt deja desann tou.
+  // Retabli defilman kontni prensipal la an wo chak fwa n chanje onglè —
+  // san sa, si w te desann nan yon lòt seksyon anvan, nouvo seksyon an
+  // parèt deja desann tou. Meni a rete fikse, li pa defile ditou kounye a.
   React.useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' });
+    mainScrollRef.current?.scrollTo({ top: 0, behavior: 'auto' });
   }, [nav]);
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState('');
@@ -797,9 +799,9 @@ export default function BlicPayAdmin() {
         </div>
       )}
 
-      <div className="flex" style={{ minHeight: '100%' }}>
-        {/* sidebar */}
-        <div className="w-56 shrink-0 hidden md:flex flex-col" style={{ background: C.navyDeep, padding: '28px 18px' }}>
+      <div className="flex" style={{ height: '100vh' }}>
+        {/* sidebar — fikse, li pa dwe defile ak rès kontni an */}
+        <div className="w-56 shrink-0 hidden md:flex flex-col" style={{ background: C.navyDeep, padding: '28px 18px', height: '100%', overflowY: 'auto' }}>
           <div className="flex items-center gap-2 px-2" style={{ marginBottom: 40 }}>
             <Logo size={26} />
             <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15, color: '#fff' }}>
@@ -830,7 +832,7 @@ export default function BlicPayAdmin() {
         </div>
 
         {/* main */}
-        <div className="flex-1" style={{ padding: '36px 44px', maxWidth: 1180, width: '100%' }}>
+        <div ref={mainScrollRef} className="flex-1" style={{ padding: '36px 44px', maxWidth: 1180, width: '100%', height: '100%', overflowY: 'auto' }}>
           <div className="flex items-center justify-between" style={{ marginBottom: 32 }}>
             <div className="flex items-center gap-2 md:hidden">
               <Logo size={24} />
