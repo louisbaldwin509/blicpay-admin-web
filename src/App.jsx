@@ -195,10 +195,12 @@ export default function BlicPayAdmin() {
   const [agents, setAgents] = useState([]);
   const [loadingAgents, setLoadingAgents] = useState(false);
   const [showAgentForm, setShowAgentForm] = useState(false);
-  const [agentForm, setAgentForm] = useState({ fullName: '', phone: '', password: '', branch: '' });
+  const [agentForm, setAgentForm] = useState({ fullName: '', phone: '', password: '', branch: '', email: '', idNumber: '', hireDate: '' });
+  const [agentPhotoFile, setAgentPhotoFile] = useState(null);
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-  const [newBranchName, setNewBranchName] = useState('');
+  const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '', managerName: '', openingHours: '' });
+  const [showBranchForm, setShowBranchForm] = useState(false);
   const [creatingBranch, setCreatingBranch] = useState(false);
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
@@ -456,29 +458,38 @@ export default function BlicPayAdmin() {
   }
 
   async function createBranch() {
-    if (!newBranchName.trim()) {
+    if (!branchForm.name.trim()) {
       flash('Antre non siikisal la.');
       return;
     }
     setCreatingBranch(true);
     try {
-      await apiFetch('/admin/branches', { method: 'POST', token, body: { name: newBranchName.trim() } });
+      await apiFetch('/admin/branches', { method: 'POST', token, body: branchForm });
       flash('Siikisal la kreye.');
-      setNewBranchName('');
+      setBranchForm({ name: '', address: '', phone: '', managerName: '', openingHours: '' });
+      setShowBranchForm(false);
       await loadBranches();
     } catch (err) { flash(err.message); } finally { setCreatingBranch(false); }
   }
 
   async function createAgent() {
     if (!agentForm.fullName.trim() || !agentForm.phone.trim() || !agentForm.password || !agentForm.branch.trim()) {
-      flash('Ranpli tout chan yo.');
+      flash('Ranpli tout chan obligatwa yo.');
       return;
     }
     setCreatingAgent(true);
     try {
-      await apiFetch('/admin/agents', { method: 'POST', token, body: agentForm });
+      let photoImage = null;
+      let photoMimeType = null;
+      if (agentPhotoFile) {
+        const dataUrl = await readFileAsBase64(agentPhotoFile);
+        photoMimeType = agentPhotoFile.type;
+        photoImage = dataUrl;
+      }
+      await apiFetch('/admin/agents', { method: 'POST', token, body: { ...agentForm, photoImage, photoMimeType } });
       flash('Kont ajan an kreye.');
-      setAgentForm({ fullName: '', phone: '', password: '', branch: '' });
+      setAgentForm({ fullName: '', phone: '', password: '', branch: '', email: '', idNumber: '', hireDate: '' });
+      setAgentPhotoFile(null);
       setShowAgentForm(false);
       await loadAgents();
     } catch (err) { flash(err.message); } finally { setCreatingAgent(false); }
@@ -2058,18 +2069,15 @@ export default function BlicPayAdmin() {
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 22 }}>
             <span className="text-xs font-medium" style={{ color: C.muted }}>Siikisal:</span>
             {branches.map((b) => (
-              <Badge key={b.id} tone="navy">{b.name}</Badge>
+              <span key={b.id} title={b.code} className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: '#EFE7D8', color: C.navy }}>
+                {b.name} <span style={{ ...fontMono, opacity: 0.65, fontSize: 10.5 }}>{b.code}</span>
+              </span>
             ))}
-            <div className="flex items-center" style={{ marginLeft: 6 }}>
-              <input value={newBranchName} onChange={(e) => setNewBranchName(e.target.value)}
-                placeholder="Ajoute yon siikisal..."
-                style={{ padding: '6px 10px', fontSize: 12.5, borderRadius: '8px 0 0 8px', border: `1px solid ${C.border}`, borderRight: 'none', width: 160 }} />
-              <button onClick={createBranch} disabled={creatingBranch}
-                className="bp-btn text-xs font-semibold"
-                style={{ padding: '6.5px 12px', borderRadius: '0 8px 8px 0', background: C.bg, border: `1px solid ${C.border}`, color: C.navy, opacity: creatingBranch ? 0.6 : 1 }}>
-                +
-              </button>
-            </div>
+            <button onClick={() => setShowBranchForm(true)}
+              className="bp-btn text-xs font-semibold flex items-center gap-1 rounded-full"
+              style={{ padding: '6px 12px', background: C.bg, border: `1px solid ${C.border}`, color: C.navy }}>
+              <Building2 size={12} /> Nouvo siikisal
+            </button>
           </div>
 
           {loadingAgents ? (
@@ -2097,12 +2105,14 @@ export default function BlicPayAdmin() {
                           <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl"
                             style={{ padding: '14px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0" style={{ background: C.bg, color: C.navy, fontSize: 12, fontWeight: 700 }}>
-                                {initials(a.fullName)}
+                              <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: C.bg, color: C.navy, fontSize: 12, fontWeight: 700 }}>
+                                {a.photoImage ? (
+                                  <img src={`data:${a.photoMimeType};base64,${a.photoImage}`} alt="" className="w-full h-full object-cover" />
+                                ) : initials(a.fullName)}
                               </div>
                               <div>
                                 <p className="text-sm font-medium">{a.fullName}</p>
-                                <p className="text-xs" style={{ color: C.muted }}>{a.phone}</p>
+                                <p className="text-xs" style={{ color: C.muted }}>{a.phone}{a.employeeCode ? ` · ${a.employeeCode}` : ''}</p>
                               </div>
                             </div>
                             <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? 'Bloke' : 'Aktif'}</Badge>
@@ -2140,6 +2150,28 @@ export default function BlicPayAdmin() {
                   <option key={b.id} value={b.name}>{b.name}</option>
                 ))}
               </select>
+
+              <p className="text-xs font-semibold" style={{ color: C.muted, marginTop: 6 }}>Enfòmasyon anplis (opsyonèl)</p>
+              <input type="email" value={agentForm.email} onChange={(e) => setAgentForm((f) => ({ ...f, email: e.target.value }))}
+                placeholder="Imèl" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input value={agentForm.idNumber} onChange={(e) => setAgentForm((f) => ({ ...f, idNumber: e.target.value }))}
+                placeholder="Nimewo pyès idantite (CIN)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <div>
+                <label className="text-xs" style={{ color: C.muted }}>Dat anbochaj</label>
+                <input type="date" value={agentForm.hireDate} onChange={(e) => setAgentForm((f) => ({ ...f, hireDate: e.target.value }))}
+                  className="mt-1 w-full rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              </div>
+              <label className="flex items-center gap-3 rounded-lg cursor-pointer" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }}>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                  {agentPhotoFile ? (
+                    <img src={URL.createObjectURL(agentPhotoFile)} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <User size={15} color={C.muted} />
+                  )}
+                </div>
+                <span className="text-xs font-medium" style={{ color: C.muted }}>{agentPhotoFile ? agentPhotoFile.name : 'Foto pwofil (opsyonèl)'}</span>
+                <input type="file" accept="image/*" className="hidden" onChange={(e) => setAgentPhotoFile(e.target.files?.[0] || null)} />
+              </label>
             </div>
             <div className="flex gap-2.5" style={{ marginTop: 20 }}>
               <button onClick={() => setShowAgentForm(false)}
@@ -2149,6 +2181,41 @@ export default function BlicPayAdmin() {
               <button onClick={createAgent} disabled={creatingAgent}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingAgent ? 0.7 : 1 }}>
                 {creatingAgent ? 'Ap kreye...' : 'Kreye kont lan'}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showBranchForm && (
+        <>
+          <div onClick={() => setShowBranchForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
+          <div className="fadein" style={{
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 53,
+            boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24,
+          }}>
+            <p className="text-sm font-semibold" style={{ color: C.ink }}>Nouvo siikisal</p>
+            <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>Yon kòd entèn ap jenere otomatikman pou li.</p>
+            <div className="flex flex-col" style={{ gap: 10 }}>
+              <input value={branchForm.name} onChange={(e) => setBranchForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="Non siikisal la" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input value={branchForm.address} onChange={(e) => setBranchForm((f) => ({ ...f, address: e.target.value }))}
+                placeholder="Adrès / katye" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input value={branchForm.phone} onChange={(e) => setBranchForm((f) => ({ ...f, phone: e.target.value }))}
+                placeholder="Telefòn biwo a" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input value={branchForm.managerName} onChange={(e) => setBranchForm((f) => ({ ...f, managerName: e.target.value }))}
+                placeholder="Non responsab la" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+              <input value={branchForm.openingHours} onChange={(e) => setBranchForm((f) => ({ ...f, openingHours: e.target.value }))}
+                placeholder="Orè (egzanp: Lendi-Vandredi 8h-16h)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+            </div>
+            <div className="flex gap-2.5" style={{ marginTop: 20 }}>
+              <button onClick={() => setShowBranchForm(false)}
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '11px', background: C.bg, color: C.muted }}>
+                Anile
+              </button>
+              <button onClick={createBranch} disabled={creatingBranch}
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
+                {creatingBranch ? 'Ap kreye...' : 'Kreye siikisal la'}
               </button>
             </div>
           </div>
