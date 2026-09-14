@@ -202,6 +202,16 @@ export default function BlicPayAdmin() {
   const [adjustAmount, setAdjustAmount] = useState('');
   const [adjustReason, setAdjustReason] = useState('');
 
+  // Demand verifikasyon siplemantè (prèv adrès, elt.) — apa de KYC/Didit
+  const [vrPending, setVrPending] = useState([]);
+  const [loadingVr, setLoadingVr] = useState(false);
+  const [selectedVr, setSelectedVr] = useState(null);
+  const [vrRejectReason, setVrRejectReason] = useState('');
+  const [userVrRequests, setUserVrRequests] = useState(null);
+  const [newVrType, setNewVrType] = useState('address_proof');
+  const [newVrNote, setNewVrNote] = useState('');
+  const [creatingVr, setCreatingVr] = useState(false);
+
   function flash(msg) {
     setToast(msg);
     setTimeout(() => setToast(null), 2600);
@@ -324,6 +334,63 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); }
   }
 
+  const VR_TYPE_LABELS = {
+    address_proof: 'Prèv adrès',
+    income_proof: 'Prèv revni',
+    identity_reverify: 'Refè verifikasyon idantite',
+    other: 'Lòt dokiman',
+  };
+
+  async function loadVerificationRequests(authToken = token) {
+    setLoadingVr(true);
+    try {
+      const { requests } = await apiFetch('/admin/verification-requests?status=submitted', { token: authToken });
+      setVrPending(requests);
+    } catch (err) { flash(err.message); } finally { setLoadingVr(false); }
+  }
+
+  async function decideVerificationRequest(decision) {
+    if (!selectedVr) return;
+    if (decision === 'reject' && !vrRejectReason.trim()) {
+      flash('Yon rezon obligatwa pou refize.');
+      return;
+    }
+    try {
+      if (decision === 'approve') {
+        await apiFetch(`/admin/verification-requests/${selectedVr.id}/approve`, { method: 'POST', token, body: {} });
+        flash('Dokiman an apwouve.');
+      } else {
+        await apiFetch(`/admin/verification-requests/${selectedVr.id}/reject`, { method: 'POST', token, body: { reason: vrRejectReason.trim() } });
+        flash('Demand lan refize.');
+      }
+      setSelectedVr(null);
+      setVrRejectReason('');
+      loadVerificationRequests();
+      if (selectedUser) loadUserVerificationRequests(selectedUser.id);
+    } catch (err) { flash(err.message); }
+  }
+
+  async function loadUserVerificationRequests(userId) {
+    setUserVrRequests(null);
+    try {
+      const { requests } = await apiFetch(`/admin/users/${userId}/verification-requests`, { token });
+      setUserVrRequests(requests);
+    } catch (err) { flash(err.message); }
+  }
+
+  async function createVerificationRequest() {
+    if (!selectedUser) return;
+    setCreatingVr(true);
+    try {
+      await apiFetch(`/admin/users/${selectedUser.id}/verification-requests`, {
+        method: 'POST', token, body: { type: newVrType, note: newVrNote.trim() || undefined },
+      });
+      flash('Demand voye bay kliyan an.');
+      setNewVrNote('');
+      loadUserVerificationRequests(selectedUser.id);
+    } catch (err) { flash(err.message); } finally { setCreatingVr(false); }
+  }
+
   async function loadUsers(authToken = token, search = '') {
     setLoadingUsers(true);
     try {
@@ -393,6 +460,9 @@ export default function BlicPayAdmin() {
     setAdjustReason('');
     setSolDocTitle('');
     setSolDocFile(null);
+    setNewVrNote('');
+    setNewVrType('address_proof');
+    loadUserVerificationRequests(u.id);
     try {
       const detail = await apiFetch(`/admin/users/${u.id}`, { token });
       setUserDetail(detail);
@@ -615,6 +685,7 @@ export default function BlicPayAdmin() {
     { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
     { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: true },
     { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
+    { id: 'verificationRequests', label: 'Dokiman Siplemantè', icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
     { id: 'users', label: 'Itilizatè', icon: User, onOpen: () => loadUsers(), adminOnly: true },
     { id: 'agents', label: 'Ajan', icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
     { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: true },
@@ -1349,6 +1420,94 @@ export default function BlicPayAdmin() {
             </div>
           )}
 
+          {nav === 'verificationRequests' && (
+            <div className="fadein">
+              {!selectedVr ? (
+                <>
+                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Dokiman Siplemantè</h1>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>{vrPending.length} demand ap tann egzamen.</p>
+
+                  <div className="mt-6 flex flex-col gap-3">
+                    {loadingVr ? (
+                      <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                    ) : vrPending.length === 0 ? (
+                      <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen demand k'ap tann.</p>
+                    ) : vrPending.map((r) => (
+                      <button key={r.id} onClick={() => { setSelectedVr(r); setVrRejectReason(''); }} className="bp-btn text-left p-4 rounded-xl flex items-center justify-between"
+                        style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: C.bg }}>
+                            <FileText size={16} color={C.navy} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">{r.user.fullName}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{r.user.phone} · {new Date(r.submittedAt).toLocaleString('fr-FR')}</p>
+                          </div>
+                        </div>
+                        <Badge tone="navy">{VR_TYPE_LABELS[r.type] || r.type}</Badge>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setSelectedVr(null)} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: C.muted }}>
+                    <ChevronLeft size={15} /> Retounen nan lis la
+                  </button>
+
+                  <div className="p-5 rounded-2xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: C.bg }}>
+                          <User size={18} color={C.navy} />
+                        </div>
+                        <div>
+                          <p className="font-bold">{selectedVr.user.fullName}</p>
+                          <p className="text-xs" style={{ color: C.muted }}>{selectedVr.user.phone}</p>
+                        </div>
+                      </div>
+                      <Badge tone="navy">{VR_TYPE_LABELS[selectedVr.type] || selectedVr.type}</Badge>
+                    </div>
+
+                    {selectedVr.note && (
+                      <p className="mt-4 text-xs p-3 rounded-lg" style={{ background: C.bg, color: C.muted }}>
+                        Nòt admin: {selectedVr.note}
+                      </p>
+                    )}
+
+                    <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>Dokiman kliyan an voye</p>
+                    {selectedVr.fileData ? (
+                      selectedVr.fileMimeType?.startsWith('image/') ? (
+                        <img src={`data:${selectedVr.fileMimeType};base64,${selectedVr.fileData}`} alt="Dokiman"
+                          className="mt-1.5 w-full rounded-lg" style={{ border: `1px solid ${C.border}`, maxHeight: 420, objectFit: 'contain', background: C.bg }} />
+                      ) : (
+                        <a className="mt-1.5 inline-block text-sm font-semibold" style={{ color: C.navy }}
+                          href={`data:${selectedVr.fileMimeType};base64,${selectedVr.fileData}`} download={`document-${selectedVr.id}`}>
+                          Telechaje dokiman an
+                        </a>
+                      )
+                    ) : (
+                      <p className="mt-1.5 text-xs" style={{ color: C.muted }}>Pa gen fichye — kliyan an refè verifikasyon idantite li via Didit (gade nan seksyon KYC).</p>
+                    )}
+
+                    <textarea value={vrRejectReason} onChange={(e) => setVrRejectReason(e.target.value)}
+                      placeholder="Rezon refi (obligatwa si ou refize)..."
+                      className="mt-4 w-full rounded-lg text-sm p-3" style={{ border: `1px solid ${C.border}`, minHeight: 60 }} />
+
+                    <div className="mt-4 flex items-center gap-3">
+                      <button onClick={() => decideVerificationRequest('reject')} className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>
+                        <X size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> Refize
+                      </button>
+                      <button onClick={() => decideVerificationRequest('approve')} className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint }}>
+                        <Check size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> Apwouve
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {nav === 'users' && (
             <div className="fadein">
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Itilizatè</h1>
@@ -1483,6 +1642,48 @@ export default function BlicPayAdmin() {
             </div>
             <input value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} placeholder="Rezon (obligatwa)"
               className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+
+            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>Dokiman siplemantè</p>
+            <div className="mt-2 flex items-center gap-2">
+              <select value={newVrType} onChange={(e) => setNewVrType(e.target.value)}
+                className="px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
+                <option value="address_proof">Prèv adrès</option>
+                <option value="income_proof">Prèv revni</option>
+                <option value="identity_reverify">Refè verifikasyon idantite</option>
+                <option value="other">Lòt dokiman</option>
+              </select>
+              <button onClick={createVerificationRequest} disabled={creatingVr}
+                className="bp-btn px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0" style={{ background: C.navy, opacity: creatingVr ? 0.6 : 1 }}>
+                Mande
+              </button>
+            </div>
+            <input value={newVrNote} onChange={(e) => setNewVrNote(e.target.value)} placeholder="Nòt pou kliyan an (opsyonèl)"
+              className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
+
+            <div className="mt-3 flex flex-col gap-2">
+              {userVrRequests === null ? (
+                <p className="text-xs" style={{ color: C.muted }}>Ap chaje...</p>
+              ) : userVrRequests.length === 0 ? (
+                <p className="text-xs" style={{ color: C.muted }}>Pa gen demand dokiman siplemantè pou kliyan sa a.</p>
+              ) : userVrRequests.map((r) => (
+                <div key={r.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ border: `1px solid ${C.border}` }}>
+                  <div>
+                    <p className="text-xs font-semibold">{VR_TYPE_LABELS[r.type] || r.type}</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{new Date(r.requestedAt).toLocaleDateString('fr-FR')}</p>
+                  </div>
+                  {r.status === 'submitted' ? (
+                    <button onClick={() => { setSelectedVr(r); setVrRejectReason(''); setNav('verificationRequests'); }}
+                      className="bp-btn text-xs font-semibold px-2.5 py-1.5 rounded-md" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}` }}>
+                      Egzamine
+                    </button>
+                  ) : (
+                    <Badge tone={r.status === 'approved' ? 'mint' : r.status === 'rejected' ? 'danger' : 'amber'}>
+                      {r.status === 'approved' ? 'Apwouve' : r.status === 'rejected' ? 'Refize' : 'Ap tann kliyan'}
+                    </Badge>
+                  )}
+                </div>
+              ))}
+            </div>
 
             <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>Istorik Depo</p>
             <div className="mt-2 flex flex-col gap-2">
