@@ -1849,28 +1849,43 @@ export default function BlicPayAdmin() {
 
               {/* KPI yo — vi jeneral an yon kout je */}
               <div className="grid grid-cols-2 lg:grid-cols-5" style={{ gap: 12, marginTop: 18 }}>
-                <div className="rounded-2xl relative overflow-hidden" style={{ padding: '18px 20px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})` }}>
+                <div className="rounded-2xl relative overflow-hidden flex flex-col items-center text-center" style={{ padding: '20px 16px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})` }}>
                   <div style={{ position: 'absolute', bottom: -50, left: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(185,134,47,0.14)' }} />
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ position: 'relative', background: 'rgba(255,255,255,0.12)', marginBottom: 10 }}>
+                    <TrendingUp size={16} color="#fff" />
+                  </div>
                   <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.7)' }}>Revni nèt total</p>
-                  <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 22, color: '#fff', marginTop: 4 }}>{money(financeData.total)}</p>
+                  <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 20, color: '#fff', marginTop: 4 }}>{money(financeData.total)}</p>
                 </div>
-                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E6F0FB', marginBottom: 10 }}>
+                    <Wallet size={16} color={C.navy} />
+                  </div>
                   <p className="text-xs" style={{ color: C.muted }}>Volim depo</p>
-                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.ink, marginTop: 4 }}>{money(financeData.totalDepositVolume)}</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.ink, marginTop: 4 }}>{money(financeData.totalDepositVolume)}</p>
                 </div>
-                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#FBEEDF', marginBottom: 10 }}>
+                    <ArrowDownLeft size={16} color={C.gold} />
+                  </div>
                   <p className="text-xs" style={{ color: C.muted }}>Volim retrè</p>
-                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.ink, marginTop: 4 }}>{money(financeData.totalWithdrawalVolume)}</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.ink, marginTop: 4 }}>{money(financeData.totalWithdrawalVolume)}</p>
                 </div>
-                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F4EBFF', marginBottom: 10 }}>
+                    <Users size={16} color={C.purple} />
+                  </div>
                   <p className="text-xs" style={{ color: C.muted }}>Volim Sòl aktif</p>
-                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.gold, marginTop: 4 }}>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.gold, marginTop: 4 }}>
                     {money((financeData.solGroups || []).reduce((s, g) => s + g.potential, 0))}
                   </p>
                 </div>
-                <div className="rounded-2xl" style={{ padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
+                <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E4F5EF', marginBottom: 10 }}>
+                    <User size={16} color={C.mint} />
+                  </div>
                   <p className="text-xs" style={{ color: C.muted }}>Kliyan sèvi</p>
-                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 22, color: C.mint, marginTop: 4 }}>{financeData.totalUniqueClients || 0}</p>
+                  <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.mint, marginTop: 4 }}>{financeData.totalUniqueClients || 0}</p>
                 </div>
               </div>
 
@@ -1906,18 +1921,27 @@ export default function BlicPayAdmin() {
               {/* Pwodwi 100% dijital — pa gen siikisal ki enplike */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Pwodwi dijital (tout kliyan, san siikisal)</p>
               <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12 }}>
-                <div className="rounded-xl" style={{ padding: 16, background: C.card, border: `1px solid ${C.border}` }}>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>BLIC DEPO</p>
+                <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E6F0FB', marginBottom: 10 }}>
+                    <Wallet size={16} color={C.navy} />
+                  </div>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>BLIC Depo</p>
                   <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.pockets.totalBalance)}</p>
                   <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.pockets.activeCount} pòch aktif</p>
                 </div>
-                <div className="rounded-xl" style={{ padding: 16, background: C.card, border: `1px solid ${C.border}` }}>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>DEPO AK OBJEKTIF</p>
+                <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E4F5EF', marginBottom: 10 }}>
+                    <PiggyBank size={16} color={C.mint} />
+                  </div>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>Depo ak objektif</p>
                   <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.goals.totalSaved)}</p>
                   <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.goals.activeCount} aktif · {financeData.digitalProducts.goals.completedCount} rive</p>
                 </div>
-                <div className="rounded-xl" style={{ padding: 16, background: C.card, border: `1px solid ${C.border}` }}>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>PRÈ</p>
+                <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#FBEEDF', marginBottom: 10 }}>
+                    <HandCoins size={16} color={C.gold} />
+                  </div>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>Prè</p>
                   <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.loans.totalOutstanding)}</p>
                   <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.loans.activeCount} prè aktif</p>
                 </div>
@@ -1926,9 +1950,12 @@ export default function BlicPayAdmin() {
               {/* Volim pa gwoup Sòl */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Volim pa gwoup Sòl</p>
               {(!financeData.solGroups || financeData.solGroups.length === 0) ? (
-                <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
-                  Pa gen okenn gwoup Sòl ak manm apwouve toujou.
-                </p>
+                <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '32px 24px' }}>
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
+                    <Users size={18} color={C.muted} />
+                  </div>
+                  <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn gwoup Sòl ak manm apwouve toujou.</p>
+                </div>
               ) : (
                 <div className="flex flex-col" style={{ gap: 10 }}>
                   {financeData.solGroups.map((g) => {
@@ -1975,9 +2002,12 @@ export default function BlicPayAdmin() {
               {/* Detay pa siikisal — kounye a ak kliyan sèvi */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Detay pa siikisal</p>
               {Object.keys(financeData.byBranch || {}).length === 0 ? (
-                <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 18 }}>
-                  Pa gen okenn siikisal kreye toujou.
-                </p>
+                <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '32px 24px' }}>
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
+                    <Building2 size={18} color={C.muted} />
+                  </div>
+                  <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn siikisal kreye toujou.</p>
+                </div>
               ) : (
                 <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                   {Object.entries(financeData.byBranch).map(([branch, stats], i) => (
@@ -2045,9 +2075,12 @@ export default function BlicPayAdmin() {
           {loadingAgents ? (
             <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
           ) : agents.length === 0 ? (
-            <p className="text-sm rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}`, padding: 24, marginTop: 24, textAlign: 'center' }}>
-              Pa gen okenn ajan kreye toujou.
-            </p>
+            <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '40px 24px', marginTop: 24 }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 14 }}>
+                <UserPlus size={20} color={C.muted} />
+              </div>
+              <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn ajan kreye toujou.</p>
+            </div>
           ) : (
             <div style={{ marginTop: 28 }}>
               {branches
