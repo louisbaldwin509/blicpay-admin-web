@@ -226,7 +226,7 @@ export default function BlicPayAdmin() {
       setWithdrawals(ws.map((w) => ({
         id: w.id, user: w.user.fullName, phone: w.user.phone, method: w.method,
         amount: w.amount, reference: w.reference, date: new Date(w.createdAt).toLocaleString('fr-FR'),
-        destinationNumber: w.destinationNumber, branch: w.branch, clientId: w.user.clientId,
+        destinationNumber: w.destinationNumber, destinationName: w.destinationName, branch: w.branch, clientId: w.user.clientId,
       })));
     } catch (err) { flash(err.message); } finally { setLoadingWithdrawals(false); }
   }
@@ -905,7 +905,7 @@ export default function BlicPayAdmin() {
                           <p className="text-xs mt-0.5" style={{ color: C.muted }}>{w.phone} · {w.date}</p>
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{w.reference}</p>
                           {w.destinationNumber && (
-                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>→ {w.destinationNumber}</p>
+                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>→ {w.destinationNumber} ({w.destinationName})</p>
                           )}
                           {w.method === 'biwo' && (
                             <p className="text-xs mt-0.5" style={{ color: C.navy }}>
@@ -1808,7 +1808,7 @@ export default function BlicPayAdmin() {
               {money(confirmingWithdrawal.amount)} · {methodIcons[confirmingWithdrawal.method]?.label || confirmingWithdrawal.method}
             </p>
             {confirmingWithdrawal.destinationNumber && (
-              <p className="text-sm mt-2 font-semibold" style={{ ...fontMono, color: C.navy }}>→ {confirmingWithdrawal.destinationNumber}</p>
+              <p className="text-sm mt-2 font-semibold" style={{ ...fontMono, color: C.navy }}>→ {confirmingWithdrawal.destinationNumber} ({confirmingWithdrawal.destinationName})</p>
             )}
             {confirmingWithdrawal.method === 'biwo' && (
               <p className="text-sm mt-2" style={{ color: C.navy }}>
