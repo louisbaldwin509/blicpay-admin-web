@@ -3,7 +3,7 @@ import {
   Bell, ShieldCheck, Users, Clock, Check, X, Building2, Smartphone,
   DollarSign, Banknote, ArrowLeftRight, LogOut, LayoutGrid, Wallet,
   AlertCircle, ChevronRight, ChevronLeft, Search, RefreshCw, ArrowDownLeft,
-  PiggyBank, HandCoins, FileText, User, Phone, Lock, BadgeCheck, Eye, TrendingUp, UserPlus,
+  PiggyBank, HandCoins, FileText, User, Phone, Lock, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
 } from 'lucide-react';
 
 const API_BASE_URL = 'https://api.blicpayht.com';
@@ -212,6 +212,10 @@ export default function BlicPayAdmin() {
   const [newVrNote, setNewVrNote] = useState('');
   const [creatingVr, setCreatingVr] = useState(false);
 
+  // Mesaj sipò kliyan yo voye (soti nan "Kontakte sipò" nan Paramèt kliyan an)
+  const [supportMessages, setSupportMessages] = useState([]);
+  const [loadingSupport, setLoadingSupport] = useState(false);
+
   function flash(msg) {
     setToast(msg);
     setTimeout(() => setToast(null), 2600);
@@ -389,6 +393,26 @@ export default function BlicPayAdmin() {
       setNewVrNote('');
       loadUserVerificationRequests(selectedUser.id);
     } catch (err) { flash(err.message); } finally { setCreatingVr(false); }
+  }
+
+  const SUPPORT_SUBJECT_LABELS = {
+    kont: 'Kont', depo: 'Depo', sol: 'BLIC Sòl', pre: 'Prè', lot: 'Lòt',
+  };
+
+  async function loadSupportMessages(authToken = token) {
+    setLoadingSupport(true);
+    try {
+      const { messages } = await apiFetch('/admin/support?status=open', { token: authToken });
+      setSupportMessages(messages);
+    } catch (err) { flash(err.message); } finally { setLoadingSupport(false); }
+  }
+
+  async function closeSupportMessage(id) {
+    try {
+      await apiFetch(`/admin/support/${id}/close`, { method: 'POST', token, body: {} });
+      setSupportMessages((ms) => ms.filter((m) => m.id !== id));
+      flash('Mesaj la make rezoud.');
+    } catch (err) { flash(err.message); }
   }
 
   async function loadUsers(authToken = token, search = '') {
@@ -686,6 +710,7 @@ export default function BlicPayAdmin() {
     { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: true },
     { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
     { id: 'verificationRequests', label: 'Dokiman Siplemantè', icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
+    { id: 'support', label: 'Mesaj Sipò', icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
     { id: 'users', label: 'Itilizatè', icon: User, onOpen: () => loadUsers(), adminOnly: true },
     { id: 'agents', label: 'Ajan', icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
     { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: true },
@@ -1505,6 +1530,41 @@ export default function BlicPayAdmin() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {nav === 'support' && (
+            <div className="fadein">
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Mesaj Sipò</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>{supportMessages.length} mesaj kliyan ki poko rezoud.</p>
+
+              <div className="mt-6 flex flex-col gap-3">
+                {loadingSupport ? (
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                ) : supportMessages.length === 0 ? (
+                  <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen mesaj k'ap tann.</p>
+                ) : supportMessages.map((m) => (
+                  <div key={m.id} className="p-4 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: C.bg }}>
+                          <User size={16} color={C.navy} />
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold">{m.user.fullName}</p>
+                          <p className="text-xs mt-0.5" style={{ color: C.muted }}>{m.user.phone} · {new Date(m.createdAt).toLocaleString('fr-FR')}</p>
+                        </div>
+                      </div>
+                      <Badge tone="navy">{SUPPORT_SUBJECT_LABELS[m.subject] || m.subject}</Badge>
+                    </div>
+                    <p className="mt-3 text-sm" style={{ color: C.ink }}>{m.message}</p>
+                    <button onClick={() => closeSupportMessage(m.id)}
+                      className="bp-btn mt-3 text-xs font-semibold px-3 py-1.5 rounded-md" style={{ background: C.bg, color: C.mint, border: `1px solid ${C.border}` }}>
+                      <Check size={12} className="inline mr-1" style={{ verticalAlign: -1 }} /> Make rezoud
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
