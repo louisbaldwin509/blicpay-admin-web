@@ -134,6 +134,12 @@ export default function BlicPayAdmin() {
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [nav, setNav] = useState('overview');
+
+  // Retounen anlè paj la chak fwa n chanje onglè — san sa, si w te desann
+  // nan yon lòt seksyon anvan, nouvo seksyon an parèt deja desann tou.
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [nav]);
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState('');
 
