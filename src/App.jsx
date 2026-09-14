@@ -214,6 +214,7 @@ export default function BlicPayAdmin() {
   const [vrPending, setVrPending] = useState([]);
   const [loadingVr, setLoadingVr] = useState(false);
   const [selectedVr, setSelectedVr] = useState(null);
+  const [selectedFinanceBranch, setSelectedFinanceBranch] = useState(null); // [non, stats] siikisal ki louvri a dwat
   const [vrRejectReason, setVrRejectReason] = useState('');
   const [userVrRequests, setUserVrRequests] = useState(null);
   const [newVrType, setNewVrType] = useState('address_proof');
@@ -1987,57 +1988,32 @@ export default function BlicPayAdmin() {
                   Pa gen okenn siikisal kreye toujou.
                 </p>
               ) : (
-                <div className="flex flex-col" style={{ gap: 12 }}>
-                  {Object.entries(financeData.byBranch).map(([branch, stats], i) => {
-                    const avgTx = stats.count > 0 ? Math.round(stats.volume / stats.count) : 0;
-                    return (
-                      <div key={branch} className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)', padding: '16px 20px' }}>
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2.5">
-                            {i === 0 && stats.fees > 0 && (
-                              <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EFE7D8' }}>
-                                <span style={{ fontSize: 12 }}>🏆</span>
-                              </div>
-                            )}
-                            <p className="text-sm font-semibold" style={{ color: C.ink }}>{branch}</p>
-                            <Badge tone="muted">{stats.agentCount} ajan</Badge>
+                <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+                  {Object.entries(financeData.byBranch).map(([branch, stats], i) => (
+                    <button key={branch} onClick={() => setSelectedFinanceBranch([branch, stats])}
+                      className="bp-btn w-full flex items-center justify-between px-5 py-3.5 text-left"
+                      style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                      <div className="flex items-center gap-2.5">
+                        {i === 0 && stats.fees > 0 && (
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EFE7D8' }}>
+                            <span style={{ fontSize: 12 }}>🏆</span>
                           </div>
-                          <p className="text-base font-bold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-5" style={{ gap: 14, marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
-                          <div>
-                            <p className="text-xs" style={{ color: C.muted }}>Depo</p>
-                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.depositVolume)}</p>
-                            <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} tranzaksyon</p>
-                          </div>
-                          <div>
-                            <p className="text-xs" style={{ color: C.muted }}>Retrè</p>
-                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.withdrawalVolume)}</p>
-                            <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} tranzaksyon</p>
-                          </div>
-                          <div>
-                            <p className="text-xs" style={{ color: C.muted }}>Volim total</p>
-                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(stats.volume)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs" style={{ color: C.muted }}>Mwayèn pa tranzaksyon</p>
-                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{money(avgTx)}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs" style={{ color: C.muted }}>Kliyan sèvi</p>
-                            <p className="text-sm font-medium" style={{ ...fontMono, marginTop: 2 }}>{stats.uniqueClients || 0}</p>
-                          </div>
-                        </div>
+                        )}
+                        <p className="text-sm font-semibold" style={{ color: C.ink }}>{branch}</p>
+                        <Badge tone="muted">{stats.agentCount} ajan</Badge>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm font-bold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
+                        <ChevronRight size={15} color={C.muted} />
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
 
               <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                Kat "Kliyan sèvi" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Kolòn "Kliyan sèvi" nan chak siikisal pi ba a konte sèlman sa yon AJAN konfime pandan peryòd la.
+                Kat "Kliyan sèvi" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Nan detay chak siikisal (klike sou li), "Kliyan sèvi" konte sèlman sa yon AJAN konfime pandan peryòd la.
               </div>
             </>
           )}
@@ -2121,8 +2097,8 @@ export default function BlicPayAdmin() {
         <>
           <div onClick={() => setShowAgentForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
           <div className="fadein" style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 420,
-            background: C.card, borderRadius: 16, zIndex: 53, padding: 26,
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 53,
+            boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24,
           }}>
             <p className="text-sm font-semibold" style={{ color: C.ink }}>Nouvo kont ajan</p>
             <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>Kont sa a ka konfime depo/retrè pou siikisal li.</p>
@@ -2154,6 +2130,62 @@ export default function BlicPayAdmin() {
           </div>
         </>
       )}
+
+      {selectedFinanceBranch && (() => {
+        const [branch, stats] = selectedFinanceBranch;
+        const avgTx = stats.count > 0 ? Math.round(stats.volume / stats.count) : 0;
+        return (
+          <>
+            <div onClick={() => setSelectedFinanceBranch(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
+            <div className="fadein" style={{
+              position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 53,
+              boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24,
+            }}>
+              <div className="flex items-center justify-between" style={{ marginBottom: 4 }}>
+                <p className="text-base font-bold" style={{ color: C.ink }}>{branch}</p>
+                <button onClick={() => setSelectedFinanceBranch(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
+                  <X size={14} color={C.muted} />
+                </button>
+              </div>
+              <Badge tone="muted">{stats.agentCount} ajan</Badge>
+
+              <div className="rounded-xl" style={{ marginTop: 18, padding: 16, background: C.bg }}>
+                <p className="text-xs" style={{ color: C.muted }}>Revni jenere</p>
+                <p className="text-xl font-bold" style={{ ...fontMono, color: C.mint, marginTop: 4 }}>{money(stats.fees)}</p>
+              </div>
+
+              <div className="flex flex-col" style={{ gap: 14, marginTop: 18 }}>
+                <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                  <div>
+                    <p className="text-sm" style={{ color: C.ink }}>Depo</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} tranzaksyon</p>
+                  </div>
+                  <p className="text-sm font-semibold" style={fontMono}>{money(stats.depositVolume)}</p>
+                </div>
+                <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                  <div>
+                    <p className="text-sm" style={{ color: C.ink }}>Retrè</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} tranzaksyon</p>
+                  </div>
+                  <p className="text-sm font-semibold" style={fontMono}>{money(stats.withdrawalVolume)}</p>
+                </div>
+                <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                  <p className="text-sm" style={{ color: C.ink }}>Volim total</p>
+                  <p className="text-sm font-semibold" style={fontMono}>{money(stats.volume)}</p>
+                </div>
+                <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
+                  <p className="text-sm" style={{ color: C.ink }}>Mwayèn pa tranzaksyon</p>
+                  <p className="text-sm font-semibold" style={fontMono}>{money(avgTx)}</p>
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-sm" style={{ color: C.ink }}>Kliyan sèvi (pa ajan)</p>
+                  <p className="text-sm font-semibold" style={fontMono}>{stats.uniqueClients || 0}</p>
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {confirmingWithdrawal && (
         <>
