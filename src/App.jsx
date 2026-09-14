@@ -201,6 +201,7 @@ export default function BlicPayAdmin() {
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '', managerName: '', openingHours: '' });
   const [showBranchForm, setShowBranchForm] = useState(false);
+  const [editingBranchId, setEditingBranchId] = useState(null); // null = kreye nouvo, id = modifye youn ki egziste
   const [creatingBranch, setCreatingBranch] = useState(false);
   const [creatingAgent, setCreatingAgent] = useState(false);
   const [userDetail, setUserDetail] = useState(null);
@@ -483,6 +484,15 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); }
   }
 
+  function openBranchEdit(b) {
+    setEditingBranchId(b.id);
+    setBranchForm({
+      name: b.name || '', address: b.address || '', phone: b.phone || '',
+      managerName: b.managerName || '', openingHours: b.openingHours || '',
+    });
+    setShowBranchForm(true);
+  }
+
   async function createBranch() {
     if (!branchForm.name.trim()) {
       flash('Antre non siikisal la.');
@@ -490,11 +500,18 @@ export default function BlicPayAdmin() {
     }
     setCreatingBranch(true);
     try {
-      await apiFetch('/admin/branches', { method: 'POST', token, body: branchForm });
-      flash('Siikisal la kreye.');
+      if (editingBranchId) {
+        await apiFetch(`/admin/branches/${editingBranchId}`, { method: 'PATCH', token, body: branchForm });
+        flash('Siikisal la mete ajou.');
+      } else {
+        await apiFetch('/admin/branches', { method: 'POST', token, body: branchForm });
+        flash('Siikisal la kreye.');
+      }
       setBranchForm({ name: '', address: '', phone: '', managerName: '', openingHours: '' });
+      setEditingBranchId(null);
       setShowBranchForm(false);
       await loadBranches();
+      await loadAgents();
     } catch (err) { flash(err.message); } finally { setCreatingBranch(false); }
   }
 
@@ -2095,15 +2112,16 @@ export default function BlicPayAdmin() {
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 22 }}>
             <span className="text-xs font-medium" style={{ color: C.muted }}>Siikisal:</span>
             {branches.map((b) => (
-              <span key={b.id} title={b.code} className="flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold" style={{ background: '#EFE7D8', color: C.navy }}>
+              <span key={b.id} title="Klike pou modifye" className="bp-btn flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold cursor-pointer"
+                onClick={() => openBranchEdit(b)} style={{ background: '#EFE7D8', color: C.navy }}>
                 {b.name} <span style={{ ...fontMono, opacity: 0.65, fontSize: 10.5 }}>{b.code}</span>
-                <button onClick={() => deleteBranch(b)} title="Efase siikisal la" aria-label="Efase siikisal la"
+                <button onClick={(e) => { e.stopPropagation(); deleteBranch(b); }} title="Efase siikisal la" aria-label="Efase siikisal la"
                   className="bp-btn w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(11,27,51,0.12)' }}>
                   <X size={9} color={C.navy} />
                 </button>
               </span>
             ))}
-            <button onClick={() => setShowBranchForm(true)}
+            <button onClick={() => { setEditingBranchId(null); setBranchForm({ name: '', address: '', phone: '', managerName: '', openingHours: '' }); setShowBranchForm(true); }}
               className="bp-btn text-xs font-semibold flex items-center gap-1 rounded-full"
               style={{ padding: '6px 12px', background: C.bg, border: `1px solid ${C.border}`, color: C.navy }}>
               <Building2 size={12} /> Nouvo siikisal
@@ -2229,13 +2247,15 @@ export default function BlicPayAdmin() {
 
       {showBranchForm && (
         <>
-          <div onClick={() => setShowBranchForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
+          <div onClick={() => { setShowBranchForm(false); setEditingBranchId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
           <div className="fadein" style={{
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 53,
             boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24,
           }}>
-            <p className="text-sm font-semibold" style={{ color: C.ink }}>Nouvo siikisal</p>
-            <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>Yon kòd entèn ap jenere otomatikman pou li.</p>
+            <p className="text-sm font-semibold" style={{ color: C.ink }}>{editingBranchId ? 'Modifye siikisal' : 'Nouvo siikisal'}</p>
+            <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>
+              {editingBranchId ? 'Chanje non an mete tout ajan ki nan siikisal sa a ajou otomatikman.' : 'Yon kòd entèn ap jenere otomatikman pou li.'}
+            </p>
             <div className="flex flex-col" style={{ gap: 10 }}>
               <input value={branchForm.name} onChange={(e) => setBranchForm((f) => ({ ...f, name: e.target.value }))}
                 placeholder="Non siikisal la" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
@@ -2249,13 +2269,13 @@ export default function BlicPayAdmin() {
                 placeholder="Orè (egzanp: Lendi-Vandredi 8h-16h)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
             </div>
             <div className="flex gap-2.5" style={{ marginTop: 20 }}>
-              <button onClick={() => setShowBranchForm(false)}
+              <button onClick={() => { setShowBranchForm(false); setEditingBranchId(null); }}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '11px', background: C.bg, color: C.muted }}>
                 Anile
               </button>
               <button onClick={createBranch} disabled={creatingBranch}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
-                {creatingBranch ? 'Ap kreye...' : 'Kreye siikisal la'}
+                {creatingBranch ? 'Ap anrejistre...' : editingBranchId ? 'Anrejistre chanjman yo' : 'Kreye siikisal la'}
               </button>
             </div>
           </div>
