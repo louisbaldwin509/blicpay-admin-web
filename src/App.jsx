@@ -52,6 +52,13 @@ const methodIcons = {
   biwo: { label: 'Nan biwo', icon: Building2, color: '#8A6423', logo: null },
 };
 
+function addMonthsToDate(dateStr, n) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  d.setMonth(d.getMonth() + n);
+  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 const DEMO_TOKEN = 'demo-token';
 
 function money(n) {
@@ -284,12 +291,20 @@ export default function BlicPayAdmin() {
   async function loadSol(authToken = token) {
     setLoadingSol(true);
     try {
-      const [{ requests }, { groups }] = await Promise.all([
-        apiFetch('/admin/sol/requests/pending', { token: authToken }),
-        apiFetch('/admin/sol/groups', { token: authToken }),
-      ]);
-      setSolRequests(requests);
-      setSolGroups(groups);
+      if (admin?.role === 'agent') {
+        // Yon ajan gen dwa wè gwoup yo sèlman (pou l ka enfòme kliyan lokal
+        // yo) — li pa gen aksè a demand k'ap tann apwobasyon yo.
+        const { groups } = await apiFetch('/admin/sol/groups', { token: authToken });
+        setSolRequests([]);
+        setSolGroups(groups);
+      } else {
+        const [{ requests }, { groups }] = await Promise.all([
+          apiFetch('/admin/sol/requests/pending', { token: authToken }),
+          apiFetch('/admin/sol/groups', { token: authToken }),
+        ]);
+        setSolRequests(requests);
+        setSolGroups(groups);
+      }
     } catch (err) { flash(err.message); } finally { setLoadingSol(false); }
   }
 
@@ -788,13 +803,13 @@ export default function BlicPayAdmin() {
 
   const NAV_ITEMS_ALL = [
     { id: 'overview', label: 'Apèsi', icon: LayoutGrid, adminOnly: true },
-    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: true },
+    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: false },
     { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
     { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => loadWithdrawals() },
     { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
-    { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: true },
+    { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: false },
     { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
-    { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: true },
+    { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: false },
     { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
     { id: 'verificationRequests', label: 'Dokiman Siplemantè', icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
     { id: 'support', label: 'Mesaj Sipò', icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
@@ -1164,18 +1179,25 @@ export default function BlicPayAdmin() {
           {nav === 'loans' && (
             <div className="fadein">
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Prè</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Apwouve oswa refize demand prè, swiv vèsman yo.</p>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>
+                {admin?.role === 'agent' ? 'Gade estati ak dat echeans prè kliyan yo.' : 'Apwouve oswa refize demand prè, swiv vèsman yo.'}
+              </p>
 
               <div className="mt-6">
                 <Table>
                   <thead style={{ background: C.bg }}>
-                    <tr><Th>Kliyan</Th><Th align="right">Montan</Th><Th>Plan</Th><Th>Vèsman</Th><Th align="center">Estati</Th><Th align="right">Aksyon</Th></tr>
+                    <tr>
+                      <Th>Kliyan</Th><Th align="right">Montan</Th><Th>Plan</Th><Th>Vèsman</Th><Th>Pwochen echeans</Th><Th align="center">Estati</Th>
+                      {admin?.role !== 'agent' && <Th align="right">Aksyon</Th>}
+                    </tr>
                   </thead>
                   <tbody>
-                    {loadingLoans ? <EmptyRow colSpan={6}>Ap chaje...</EmptyRow>
-                      : loans.length === 0 ? <EmptyRow colSpan={6}>Pa gen prè.</EmptyRow>
+                    {loadingLoans ? <EmptyRow colSpan={7}>Ap chaje...</EmptyRow>
+                      : loans.length === 0 ? <EmptyRow colSpan={7}>Pa gen prè.</EmptyRow>
                       : loans.map((l) => {
                         const paidCount = (l.installments || []).filter((i) => i.status === 'paid').length;
+                        const nextInstallment = (l.installments || []).find((i) => i.status !== 'paid');
+                        const nextDue = nextInstallment ? addMonthsToDate(l.decidedAt || l.createdAt, nextInstallment.n) : null;
                         return (
                           <tr key={l.id} style={{ opacity: l.status === 'rejected' ? 0.5 : 1 }}>
                             <Td>
@@ -1190,19 +1212,22 @@ export default function BlicPayAdmin() {
                             <Td align="right"><span className="font-semibold">{money(l.amount)}</span></Td>
                             <Td>{l.months} mwa · {(l.rate * 100).toFixed(0)}%</Td>
                             <Td>{l.status === 'pending' ? '—' : `${paidCount}/${l.installments.length} peye`}</Td>
+                            <Td>{nextDue || '—'}</Td>
                             <Td align="center">
                               <Badge tone={l.status === 'pending' ? 'amber' : l.status === 'active' ? 'navy' : l.status === 'rejected' ? 'danger' : 'mint'}>
                                 {l.status === 'pending' ? 'Ap tann' : l.status === 'active' ? 'Aktif' : l.status === 'rejected' ? 'Refize' : 'Peye'}
                               </Badge>
                             </Td>
-                            <Td align="right">
-                              {l.status === 'pending' && (
-                                <div className="flex items-center gap-2 justify-end">
-                                  <button onClick={() => rejectLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>Refize</button>
-                                  <button onClick={() => approveLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: C.mint }}>Apwouve</button>
-                                </div>
-                              )}
-                            </Td>
+                            {admin?.role !== 'agent' && (
+                              <Td align="right">
+                                {l.status === 'pending' && (
+                                  <div className="flex items-center gap-2 justify-end">
+                                    <button onClick={() => rejectLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>Refize</button>
+                                    <button onClick={() => approveLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: C.mint }}>Apwouve</button>
+                                  </div>
+                                )}
+                              </Td>
+                            )}
                           </tr>
                         );
                       })}
@@ -1242,8 +1267,12 @@ export default function BlicPayAdmin() {
           {nav === 'sol' && (
             <div className="fadein">
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>BLIC Sòl</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Apwouve demand adezyon, swiv kapasite chak gwoup.</p>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>
+                {admin?.role === 'agent' ? 'Gade enfòmasyon gwoup yo pou reponn kesyon kliyan lokal ou yo.' : 'Apwouve demand adezyon, swiv kapasite chak gwoup.'}
+              </p>
 
+              {admin?.role !== 'agent' && (
+              <>
               <div className="mt-6 flex items-center justify-between">
                 <h3 className="font-semibold text-sm" style={{ color: C.muted }}>DEMAND K'AP TANN APWOBASYON</h3>
               </div>
@@ -1302,6 +1331,8 @@ export default function BlicPayAdmin() {
                   </div>
                 ))}
               </div>
+              </>
+              )}
 
               <div className="mt-8 flex items-center justify-between">
                 <h3 className="font-semibold text-sm" style={{ color: C.muted }}>TOUT GWOUP YO (90)</h3>
@@ -1722,13 +1753,17 @@ export default function BlicPayAdmin() {
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold" style={{ color: C.navy }}>{m.payoutDate}</p>
-                    <select value={m.turnIndex + 1}
-                      onChange={(e) => reassignSolPosition(selectedSolGroup.id, m.id, Number(e.target.value))}
-                      className="mt-1 text-xs rounded-md px-1.5 py-0.5" style={{ border: `1px solid ${C.border}`, color: C.muted }}>
-                      {Array.from({ length: selectedSolGroup.maxMembers }, (_, idx) => idx + 1).map((pos) => (
-                        <option key={pos} value={pos}>pozisyon #{pos}</option>
-                      ))}
-                    </select>
+                    {admin?.role === 'agent' ? (
+                      <p className="mt-1 text-xs" style={{ color: C.muted }}>pozisyon #{m.turnIndex + 1}</p>
+                    ) : (
+                      <select value={m.turnIndex + 1}
+                        onChange={(e) => reassignSolPosition(selectedSolGroup.id, m.id, Number(e.target.value))}
+                        className="mt-1 text-xs rounded-md px-1.5 py-0.5" style={{ border: `1px solid ${C.border}`, color: C.muted }}>
+                        {Array.from({ length: selectedSolGroup.maxMembers }, (_, idx) => idx + 1).map((pos) => (
+                          <option key={pos} value={pos}>pozisyon #{pos}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </div>
               ))}
@@ -1900,7 +1935,9 @@ export default function BlicPayAdmin() {
       {nav === 'finance' && (
         <div className="fadein">
           <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Finans</h1>
-          <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Vi jeneral sou volim ak revni BLICPay — detaye pa sous ak pa siikisal.</p>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>
+            {admin?.role === 'agent' ? `Volim ou jenere nan siikisal ${admin?.branch || ''}.` : 'Vi jeneral sou volim ak revni BLICPay — detaye pa sous ak pa siikisal.'}
+          </p>
 
           {loadingFinance || !financeData ? (
             <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
@@ -1927,7 +1964,8 @@ export default function BlicPayAdmin() {
               </div>
 
               {/* KPI yo — vi jeneral an yon kout je */}
-              <div className="grid grid-cols-2 lg:grid-cols-5" style={{ gap: 12, marginTop: 18 }}>
+              <div className={`grid grid-cols-2 ${admin?.role === 'agent' ? 'lg:grid-cols-3' : 'lg:grid-cols-5'}`} style={{ gap: 12, marginTop: 18 }}>
+                {admin?.role !== 'agent' && (
                 <div className="rounded-2xl relative overflow-hidden flex flex-col items-center text-center" style={{ padding: '20px 16px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})` }}>
                   <div style={{ position: 'absolute', bottom: -50, left: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(185,134,47,0.14)' }} />
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ position: 'relative', background: 'rgba(255,255,255,0.12)', marginBottom: 10 }}>
@@ -1936,6 +1974,7 @@ export default function BlicPayAdmin() {
                   <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.7)' }}>Revni nèt total</p>
                   <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 20, color: '#fff', marginTop: 4 }}>{money(financeData.total)}</p>
                 </div>
+                )}
                 <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E6F0FB', marginBottom: 10 }}>
                     <Wallet size={16} color={C.navy} />
@@ -1950,6 +1989,7 @@ export default function BlicPayAdmin() {
                   <p className="text-xs" style={{ color: C.muted }}>Volim retrè</p>
                   <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.ink, marginTop: 4 }}>{money(financeData.totalWithdrawalVolume)}</p>
                 </div>
+                {admin?.role !== 'agent' && (
                 <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F4EBFF', marginBottom: 10 }}>
                     <Users size={16} color={C.purple} />
@@ -1959,6 +1999,7 @@ export default function BlicPayAdmin() {
                     {money((financeData.solGroups || []).reduce((s, g) => s + g.potential, 0))}
                   </p>
                 </div>
+                )}
                 <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E4F5EF', marginBottom: 10 }}>
                     <User size={16} color={C.mint} />
@@ -1969,7 +2010,7 @@ export default function BlicPayAdmin() {
               </div>
 
               {/* Grafik volim jou pa jou */}
-              {financeData.dailyVolume && financeData.dailyVolume.length > 0 && (
+              {admin?.role !== 'agent' && financeData.dailyVolume && financeData.dailyVolume.length > 0 && (
                 <div className="rounded-2xl" style={{ marginTop: 20, padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="flex items-center justify-between flex-wrap gap-2" style={{ marginBottom: 14 }}>
                     <p className="text-sm font-semibold" style={{ color: C.ink }}>Volim jou pa jou</p>
@@ -1997,6 +2038,8 @@ export default function BlicPayAdmin() {
                 </div>
               )}
 
+              {admin?.role !== 'agent' && (
+              <>
               {/* Pwodwi 100% dijital — pa gen siikisal ki enplike */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Pwodwi dijital (tout kliyan, san siikisal)</p>
               <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12 }}>
@@ -2077,9 +2120,13 @@ export default function BlicPayAdmin() {
                   </div>
                 ))}
               </div>
+              </>
+              )}
 
               {/* Detay pa siikisal — kounye a ak kliyan sèvi */}
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Detay pa siikisal</p>
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>
+                {admin?.role === 'agent' ? `Detay siikisal ${admin?.branch || ''}` : 'Detay pa siikisal'}
+              </p>
               {Object.keys(financeData.byBranch || {}).length === 0 ? (
                 <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '32px 24px' }}>
                   <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
@@ -2111,10 +2158,12 @@ export default function BlicPayAdmin() {
                 </div>
               )}
 
+              {admin?.role !== 'agent' && (
               <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
                 Kat "Kliyan sèvi" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Nan detay chak siikisal (klike sou li), "Kliyan sèvi" konte sèlman sa yon AJAN konfime pandan peryòd la.
               </div>
+              )}
             </>
           )}
         </div>
