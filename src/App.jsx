@@ -175,6 +175,8 @@ export default function BlicPayAdmin() {
   const [solRequests, setSolRequests] = useState([]);
   const [loadingSol, setLoadingSol] = useState(false);
   const [solGroups, setSolGroups] = useState([]);
+  const [solFreqFilter, setSolFreqFilter] = useState('all');
+  const [solTierFilter, setSolTierFilter] = useState('all');
   const [selectedSolGroup, setSelectedSolGroup] = useState(null);
   const [solGroupMembers, setSolGroupMembers] = useState(null);
   const [approvingSolId, setApprovingSolId] = useState(null);
@@ -1334,11 +1336,52 @@ export default function BlicPayAdmin() {
               </>
               )}
 
-              <div className="mt-8 flex items-center justify-between">
-                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>TOUT GWOUP YO (90)</h3>
+              <div className="mt-8 flex items-center justify-between flex-wrap gap-3">
+                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>TOUT GWOUP YO ({solGroups.length})</h3>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    {[
+                      { id: 'all', label: 'Tout' },
+                      { id: 'semenn', label: 'Chak semenn' },
+                      { id: 'kenzenn', label: 'Chak 15 jou' },
+                      { id: 'mwa', label: 'Chak mwa' },
+                    ].map((f) => (
+                      <button key={f.id} onClick={() => setSolFreqFilter(f.id)}
+                        className="bp-btn rounded-lg text-xs font-medium"
+                        style={{ padding: '6px 11px',
+                          background: solFreqFilter === f.id ? C.navy : C.card,
+                          color: solFreqFilter === f.id ? '#fff' : C.muted,
+                          border: `1px solid ${solFreqFilter === f.id ? C.navy : C.border}`,
+                        }}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {[
+                      { id: 'all', label: 'Tout nivo' },
+                      { id: 'basic', label: 'Basic' },
+                      { id: 'standard', label: 'Standard' },
+                      { id: 'premium', label: 'Premium' },
+                    ].map((t) => (
+                      <button key={t.id} onClick={() => setSolTierFilter(t.id)}
+                        className="bp-btn rounded-lg text-xs font-medium"
+                        style={{ padding: '6px 11px',
+                          background: solTierFilter === t.id ? C.navy : C.card,
+                          color: solTierFilter === t.id ? '#fff' : C.muted,
+                          border: `1px solid ${solTierFilter === t.id ? C.navy : C.border}`,
+                        }}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-              <div className="mt-3 grid md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
-                {solGroups.map((g) => {
+              <div className="mt-3 grid md:grid-cols-3 lg:grid-cols-4 gap-3">
+                {solGroups
+                  .filter((g) => solFreqFilter === 'all' || g.frequencyId === solFreqFilter)
+                  .filter((g) => solTierFilter === 'all' || g.tierId === solTierFilter)
+                  .map((g) => {
                   const isFull = g.approvedCount >= g.maxMembers;
                   return (
                     <button key={g.id} onClick={() => openSolGroup(g)} className="bp-btn text-left p-4 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
