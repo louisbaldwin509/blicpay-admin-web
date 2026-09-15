@@ -197,6 +197,8 @@ export default function BlicPayAdmin() {
   const [showAgentForm, setShowAgentForm] = useState(false);
   const [agentForm, setAgentForm] = useState({ fullName: '', phone: '', password: '', branch: '', email: '', idNumber: '', hireDate: '' });
   const [agentPhotoFile, setAgentPhotoFile] = useState(null);
+  const [editingAgentId, setEditingAgentId] = useState(null); // null = kreye nouvo, id = modifye youn ki egziste
+  const [existingAgentPhoto, setExistingAgentPhoto] = useState(null); // { photoImage, photoMimeType } lè n ap modifye
   const [branches, setBranches] = useState([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
   const [branchForm, setBranchForm] = useState({ name: '', address: '', phone: '', managerName: '', openingHours: '' });
@@ -515,24 +517,47 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); } finally { setCreatingBranch(false); }
   }
 
+  function openAgentEdit(a) {
+    setEditingAgentId(a.id);
+    setAgentForm({
+      fullName: a.fullName || '', phone: a.phone || '', password: '', branch: a.branch || '',
+      email: a.email || '', idNumber: a.idNumber || '',
+      hireDate: a.hireDate ? a.hireDate.slice(0, 10) : '',
+    });
+    setExistingAgentPhoto(a.photoImage ? { photoImage: a.photoImage, photoMimeType: a.photoMimeType } : null);
+    setAgentPhotoFile(null);
+    setShowAgentForm(true);
+  }
+
   async function createAgent() {
-    if (!agentForm.fullName.trim() || !agentForm.phone.trim() || !agentForm.password || !agentForm.branch.trim()) {
+    if (!agentForm.fullName.trim() || !agentForm.phone.trim() || (!editingAgentId && !agentForm.password) || !agentForm.branch.trim()) {
       flash('Ranpli tout chan obligatwa yo.');
       return;
     }
     setCreatingAgent(true);
     try {
-      let photoImage = null;
-      let photoMimeType = null;
+      let photoImage = existingAgentPhoto?.photoImage || null;
+      let photoMimeType = existingAgentPhoto?.photoMimeType || null;
       if (agentPhotoFile) {
-        const dataUrl = await readFileAsBase64(agentPhotoFile);
+        photoImage = await readFileAsBase64(agentPhotoFile);
         photoMimeType = agentPhotoFile.type;
-        photoImage = dataUrl;
       }
-      await apiFetch('/admin/agents', { method: 'POST', token, body: { ...agentForm, photoImage, photoMimeType } });
-      flash('Kont ajan an kreye.');
+      if (editingAgentId) {
+        await apiFetch(`/admin/agents/${editingAgentId}`, { method: 'PATCH', token, body: { ...agentForm, photoImage, photoMimeType } });
+        flash('Ajan an mete ajou.');
+        setAgents((ags) => ags.map((x) => x.id !== editingAgentId ? x : {
+          ...x, fullName: agentForm.fullName.trim(), phone: agentForm.phone.trim(), branch: agentForm.branch.trim(),
+          email: agentForm.email?.trim() || null, idNumber: agentForm.idNumber?.trim() || null,
+          hireDate: agentForm.hireDate || null, photoImage, photoMimeType,
+        }));
+      } else {
+        await apiFetch('/admin/agents', { method: 'POST', token, body: { ...agentForm, photoImage, photoMimeType } });
+        flash('Kont ajan an kreye.');
+      }
       setAgentForm({ fullName: '', phone: '', password: '', branch: '', email: '', idNumber: '', hireDate: '' });
       setAgentPhotoFile(null);
+      setExistingAgentPhoto(null);
+      setEditingAgentId(null);
       setShowAgentForm(false);
       await loadAgents();
     } catch (err) { flash(err.message); } finally { setCreatingAgent(false); }
@@ -2102,7 +2127,13 @@ export default function BlicPayAdmin() {
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Ajan</h1>
               <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Kont ajan pou chak siikisal.</p>
             </div>
-            <button onClick={() => setShowAgentForm(true)}
+            <button onClick={() => {
+                setEditingAgentId(null);
+                setAgentForm({ fullName: '', phone: '', password: '', branch: '', email: '', idNumber: '', hireDate: '' });
+                setAgentPhotoFile(null);
+                setExistingAgentPhoto(null);
+                setShowAgentForm(true);
+              }}
               className="bp-btn rounded-lg text-sm font-semibold text-white flex items-center gap-2"
               style={{ padding: '10px 16px', background: C.navy }}>
               <UserPlus size={15} /> Nouvo ajan
@@ -2150,7 +2181,7 @@ export default function BlicPayAdmin() {
                       <p className="text-xs font-semibold" style={{ color: C.muted, marginBottom: 8 }}>{branchName}</p>
                       <div className="grid sm:grid-cols-2 lg:grid-cols-3" style={{ gap: 10 }}>
                         {branchAgents.map((a) => (
-                          <div key={a.id} className="flex items-center justify-between gap-3 rounded-xl"
+                          <div key={a.id} onClick={() => openAgentEdit(a)} className="bp-btn flex items-center justify-between gap-3 rounded-xl cursor-pointer"
                             style={{ padding: '14px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: C.bg, color: C.navy, fontSize: 12, fontWeight: 700 }}>
@@ -2165,11 +2196,11 @@ export default function BlicPayAdmin() {
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? 'Bloke' : 'Aktif'}</Badge>
-                              <button onClick={() => toggleAgentBlock(a)} title={a.blocked ? 'Debloke' : 'Bloke'}
+                              <button onClick={(e) => { e.stopPropagation(); toggleAgentBlock(a); }} title={a.blocked ? 'Debloke' : 'Bloke'}
                                 className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
                                 <Lock size={12} color={C.muted} />
                               </button>
-                              <button onClick={() => deleteAgent(a)} title="Efase"
+                              <button onClick={(e) => { e.stopPropagation(); deleteAgent(a); }} title="Efase"
                                 className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FBEBE6' }}>
                                 <X size={12} color={C.danger} />
                               </button>
@@ -2187,58 +2218,65 @@ export default function BlicPayAdmin() {
 
       {showAgentForm && (
         <>
-          <div onClick={() => setShowAgentForm(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
+          <div onClick={() => { setShowAgentForm(false); setEditingAgentId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
           <div className="fadein" style={{
-            position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 53,
-            boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24,
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: C.card, zIndex: 53,
+            boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: '30px 28px',
           }}>
-            <p className="text-sm font-semibold" style={{ color: C.ink }}>Nouvo kont ajan</p>
-            <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>Kont sa a ka konfime depo/retrè pou siikisal li.</p>
-            <div className="flex flex-col" style={{ gap: 10 }}>
+            <p className="text-base font-semibold" style={{ color: C.ink }}>{editingAgentId ? 'Modifye ajan' : 'Nouvo kont ajan'}</p>
+            <p className="text-xs" style={{ color: C.muted, marginTop: 4, marginBottom: 22 }}>
+              {editingAgentId ? 'Kite modpas la vid si w pa vle chanje l.' : 'Kont sa a ka konfime depo/retrè pou siikisal li.'}
+            </p>
+            <div className="flex flex-col" style={{ gap: 13 }}>
               <input value={agentForm.fullName} onChange={(e) => setAgentForm((f) => ({ ...f, fullName: e.target.value }))}
-                placeholder="Non konplè" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Non konplè" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={agentForm.phone} onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Nimewo telefòn" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Nimewo telefòn" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input type="password" value={agentForm.password} onChange={(e) => setAgentForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder="Modpas (6+ karaktè)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={editingAgentId ? 'Modpas (kite vid pou kenbe ansyen an)' : 'Modpas (6+ karaktè)'}
+                className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <select value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
-                className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }}>
+                className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }}>
                 <option value="">Chwazi siikisal...</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.name}>{b.name}</option>
                 ))}
               </select>
 
-              <p className="text-xs font-semibold" style={{ color: C.muted, marginTop: 6 }}>Enfòmasyon anplis (opsyonèl)</p>
+              <p className="text-xs font-semibold" style={{ color: C.muted, marginTop: 8, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>Enfòmasyon anplis (opsyonèl)</p>
               <input type="email" value={agentForm.email} onChange={(e) => setAgentForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="Imèl" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Imèl" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={agentForm.idNumber} onChange={(e) => setAgentForm((f) => ({ ...f, idNumber: e.target.value }))}
-                placeholder="Nimewo pyès idantite (CIN)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Nimewo pyès idantite (CIN)" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <div>
                 <label className="text-xs" style={{ color: C.muted }}>Dat anbochaj</label>
                 <input type="date" value={agentForm.hireDate} onChange={(e) => setAgentForm((f) => ({ ...f, hireDate: e.target.value }))}
-                  className="mt-1 w-full rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                  className="mt-1.5 w-full rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               </div>
-              <label className="flex items-center gap-3 rounded-lg cursor-pointer" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }}>
+              <label className="flex items-center gap-3 rounded-lg cursor-pointer" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }}>
                 <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                   {agentPhotoFile ? (
                     <img src={URL.createObjectURL(agentPhotoFile)} alt="" className="w-full h-full object-cover" />
+                  ) : existingAgentPhoto ? (
+                    <img src={`data:${existingAgentPhoto.photoMimeType};base64,${existingAgentPhoto.photoImage}`} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <User size={15} color={C.muted} />
                   )}
                 </div>
-                <span className="text-xs font-medium" style={{ color: C.muted }}>{agentPhotoFile ? agentPhotoFile.name : 'Foto pwofil (opsyonèl)'}</span>
+                <span className="text-xs font-medium" style={{ color: C.muted }}>
+                  {agentPhotoFile ? agentPhotoFile.name : existingAgentPhoto ? 'Chanje foto pwofil la' : 'Foto pwofil (opsyonèl)'}
+                </span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => setAgentPhotoFile(e.target.files?.[0] || null)} />
               </label>
             </div>
-            <div className="flex gap-2.5" style={{ marginTop: 20 }}>
-              <button onClick={() => setShowAgentForm(false)}
-                className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '11px', background: C.bg, color: C.muted }}>
+            <div className="flex gap-2.5" style={{ marginTop: 24 }}>
+              <button onClick={() => { setShowAgentForm(false); setEditingAgentId(null); }}
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '12px', background: C.bg, color: C.muted }}>
                 Anile
               </button>
               <button onClick={createAgent} disabled={creatingAgent}
-                className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingAgent ? 0.7 : 1 }}>
-                {creatingAgent ? 'Ap kreye...' : 'Kreye kont lan'}
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '12px', background: C.navy, opacity: creatingAgent ? 0.7 : 1 }}>
+                {creatingAgent ? 'Ap anrejistre...' : editingAgentId ? 'Anrejistre chanjman yo' : 'Kreye kont lan'}
               </button>
             </div>
           </div>
@@ -2249,32 +2287,32 @@ export default function BlicPayAdmin() {
         <>
           <div onClick={() => { setShowBranchForm(false); setEditingBranchId(null); }} style={{ position: 'fixed', inset: 0, background: 'rgba(10,33,64,0.5)', zIndex: 52 }} />
           <div className="fadein" style={{
-            position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 53,
-            boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24,
+            position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: C.card, zIndex: 53,
+            boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: '30px 28px',
           }}>
-            <p className="text-sm font-semibold" style={{ color: C.ink }}>{editingBranchId ? 'Modifye siikisal' : 'Nouvo siikisal'}</p>
-            <p className="text-xs" style={{ color: C.muted, marginTop: 2, marginBottom: 18 }}>
+            <p className="text-base font-semibold" style={{ color: C.ink }}>{editingBranchId ? 'Modifye siikisal' : 'Nouvo siikisal'}</p>
+            <p className="text-xs" style={{ color: C.muted, marginTop: 4, marginBottom: 22 }}>
               {editingBranchId ? 'Chanje non an mete tout ajan ki nan siikisal sa a ajou otomatikman.' : 'Yon kòd entèn ap jenere otomatikman pou li.'}
             </p>
-            <div className="flex flex-col" style={{ gap: 10 }}>
+            <div className="flex flex-col" style={{ gap: 13 }}>
               <input value={branchForm.name} onChange={(e) => setBranchForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Non siikisal la" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Non siikisal la" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.address} onChange={(e) => setBranchForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Adrès / katye" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Adrès / katye" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.phone} onChange={(e) => setBranchForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Telefòn biwo a" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Telefòn biwo a" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.managerName} onChange={(e) => setBranchForm((f) => ({ ...f, managerName: e.target.value }))}
-                placeholder="Non responsab la" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Non responsab la" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.openingHours} onChange={(e) => setBranchForm((f) => ({ ...f, openingHours: e.target.value }))}
-                placeholder="Orè (egzanp: Lendi-Vandredi 8h-16h)" className="rounded-lg text-sm" style={{ padding: '10px 13px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder="Orè (egzanp: Lendi-Vandredi 8h-16h)" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
             </div>
-            <div className="flex gap-2.5" style={{ marginTop: 20 }}>
+            <div className="flex gap-2.5" style={{ marginTop: 24 }}>
               <button onClick={() => { setShowBranchForm(false); setEditingBranchId(null); }}
-                className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '11px', background: C.bg, color: C.muted }}>
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '12px', background: C.bg, color: C.muted }}>
                 Anile
               </button>
               <button onClick={createBranch} disabled={creatingBranch}
-                className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '11px', background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
+                className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '12px', background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
                 {creatingBranch ? 'Ap anrejistre...' : editingBranchId ? 'Anrejistre chanjman yo' : 'Kreye siikisal la'}
               </button>
             </div>
