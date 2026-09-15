@@ -1767,8 +1767,8 @@ export default function BlicPayAdmin() {
       {/* Sol group members + payout dates drawer */}
       {selectedSolGroup && (
         <>
-          <div onClick={() => setSelectedSolGroup(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.35)', zIndex: 20 }} />
-          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 21, boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24 }}>
+          <div onClick={() => setSelectedSolGroup(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.35)', zIndex: 50 }} />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, background: C.card, zIndex: 51, boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24 }}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-bold">{selectedSolGroup.name}</p>
@@ -1818,8 +1818,8 @@ export default function BlicPayAdmin() {
       {/* Per-user detail drawer */}
       {selectedUser && (
         <>
-          <div onClick={() => setSelectedUser(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.35)', zIndex: 20 }} />
-          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: C.card, zIndex: 21, boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24 }}>
+          <div onClick={() => setSelectedUser(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.35)', zIndex: 50 }} />
+          <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: C.card, zIndex: 51, boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: 24 }}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ background: selectedUser.role === 'admin' ? '#F4EBFF' : C.bg, color: selectedUser.role === 'admin' ? C.purple : C.navy }}>
