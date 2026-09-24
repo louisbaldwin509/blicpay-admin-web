@@ -153,6 +153,14 @@ export default function BlicPayAdmin() {
   // Depo
   const [pending, setPending] = useState([]);
   const [loadingPending, setLoadingPending] = useState(false);
+  const [depositHistory, setDepositHistory] = useState([]);
+  const [loadingDepositHistory, setLoadingDepositHistory] = useState(false);
+  const [depositView, setDepositView] = useState('pending'); // 'pending' | 'history'
+  const [withdrawalHistory, setWithdrawalHistory] = useState([]);
+  const [loadingWithdrawalHistory, setLoadingWithdrawalHistory] = useState(false);
+  const [withdrawalView, setWithdrawalView] = useState('pending'); // 'pending' | 'history'
+  const [solPayouts, setSolPayouts] = useState([]);
+  const [loadingSolPayouts, setLoadingSolPayouts] = useState(false);
   const [confirmed, setConfirmed] = useState([]);
 
   // Retrait
@@ -250,8 +258,42 @@ export default function BlicPayAdmin() {
       setPending(deposits.map((d) => ({
         id: d.id, user: d.user.fullName, phone: d.user.phone, method: d.method,
         amount: d.amount, reference: d.reference, date: new Date(d.createdAt).toLocaleString('fr-FR'),
+        branch: d.branch,
       })));
     } catch (err) { flash(err.message); } finally { setLoadingPending(false); }
+  }
+
+  async function loadDepositHistory(authToken = token) {
+    setLoadingDepositHistory(true);
+    try {
+      const { deposits } = await apiFetch('/admin/deposits/history', { token: authToken });
+      setDepositHistory(deposits.map((d) => ({
+        id: d.id, user: d.user.fullName, phone: d.user.phone, method: d.method,
+        amount: d.amount, reference: d.reference, status: d.status, branch: d.branch,
+        date: new Date(d.createdAt).toLocaleString('fr-FR'),
+      })));
+    } catch (err) { flash(err.message); } finally { setLoadingDepositHistory(false); }
+  }
+
+  async function loadWithdrawalHistory(authToken = token) {
+    setLoadingWithdrawalHistory(true);
+    try {
+      const { withdrawals: ws } = await apiFetch('/admin/withdrawals/history', { token: authToken });
+      setWithdrawalHistory(ws.map((w) => ({
+        id: w.id, user: w.user.fullName, phone: w.user.phone, method: w.method,
+        amount: w.amount, reference: w.reference, status: w.status, branch: w.branch,
+        destinationNumber: w.destinationNumber, destinationName: w.destinationName,
+        date: new Date(w.createdAt).toLocaleString('fr-FR'),
+      })));
+    } catch (err) { flash(err.message); } finally { setLoadingWithdrawalHistory(false); }
+  }
+
+  async function loadSolPayouts(authToken = token) {
+    setLoadingSolPayouts(true);
+    try {
+      const { payouts } = await apiFetch('/admin/sol/payouts', { token: authToken });
+      setSolPayouts(payouts);
+    } catch (err) { flash(err.message); } finally { setLoadingSolPayouts(false); }
   }
 
   async function loadWithdrawals(authToken = token) {
@@ -812,6 +854,7 @@ export default function BlicPayAdmin() {
     { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: false },
     { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
     { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: false },
+    { id: 'solPayouts', label: 'Pòch Sòl resevwa', icon: HandCoins, onOpen: () => loadSolPayouts(), adminOnly: false },
     { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
     { id: 'verificationRequests', label: 'Dokiman Siplemantè', icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
     { id: 'support', label: 'Mesaj Sipò', icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
@@ -1003,19 +1046,38 @@ export default function BlicPayAdmin() {
                   <p className="text-sm mt-1" style={{ color: C.muted }}>Konfime oswa rejte demand depo yo.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="relative">
-                    <Search size={14} color={C.muted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                    <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chèche non oswa referans"
-                      className="pl-8 pr-3 py-2 rounded-lg text-sm" style={{ background: C.card, border: `1px solid ${C.border}`, width: 220 }} />
-                  </div>
-                  <button onClick={() => loadPending(token)} aria-label="Rafrechi"
+                  {depositView === 'pending' && (
+                    <div className="relative">
+                      <Search size={14} color={C.muted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
+                      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chèche non oswa referans"
+                        className="pl-8 pr-3 py-2 rounded-lg text-sm" style={{ background: C.card, border: `1px solid ${C.border}`, width: 220 }} />
+                    </div>
+                  )}
+                  <button onClick={() => depositView === 'pending' ? loadPending(token) : loadDepositHistory()} aria-label="Rafrechi"
                     className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                     style={{ background: C.card, border: `1px solid ${C.border}` }}>
-                    <RefreshCw size={14} color={C.muted} style={loadingPending ? { animation: 'spin 0.8s linear infinite' } : undefined} />
+                    <RefreshCw size={14} color={C.muted} style={(loadingPending || loadingDepositHistory) ? { animation: 'spin 0.8s linear infinite' } : undefined} />
                   </button>
                 </div>
               </div>
 
+              <div className="flex items-center gap-1.5" style={{ marginTop: 16 }}>
+                <button onClick={() => setDepositView('pending')}
+                  className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
+                    background: depositView === 'pending' ? C.navy : C.card, color: depositView === 'pending' ? '#fff' : C.muted,
+                    border: `1px solid ${depositView === 'pending' ? C.navy : C.border}` }}>
+                  Ap tann
+                </button>
+                <button onClick={() => { setDepositView('history'); if (depositHistory.length === 0) loadDepositHistory(); }}
+                  className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
+                    background: depositView === 'history' ? C.navy : C.card, color: depositView === 'history' ? '#fff' : C.muted,
+                    border: `1px solid ${depositView === 'history' ? C.navy : C.border}` }}>
+                  Istorik
+                </button>
+              </div>
+
+              {depositView === 'pending' && (
+              <>
               <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                 {filteredPending.length === 0 ? (
                   <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen okenn rezilta.</p>
@@ -1031,6 +1093,9 @@ export default function BlicPayAdmin() {
                         <div>
                           <p className="text-sm font-semibold">{d.user}</p>
                           <p className="text-xs mt-0.5" style={{ color: C.muted }}>{d.phone} · {d.date}</p>
+                          {d.branch && (
+                            <p className="text-xs mt-0.5 font-semibold" style={{ color: C.navy }}>📍 {d.branch}</p>
+                          )}
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{d.reference}</p>
                           {d.transactionId && (
                             <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>TID: {d.transactionId}</p>
@@ -1066,19 +1131,80 @@ export default function BlicPayAdmin() {
                   );
                 })}
               </div>
+              </>
+              )}
 
+              {depositView === 'history' && (
+                <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+                  {loadingDepositHistory ? (
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Ap chaje...</p>
+                  ) : depositHistory.length === 0 ? (
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen istorik toujou.</p>
+                  ) : depositHistory.map((d, i) => {
+                    const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
+                    return (
+                      <div key={d.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+                        style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none', opacity: d.status === 'rejected' ? 0.55 : 1 }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                            {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={14} color="#fff" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">{d.user}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{M.label} · {d.date}{d.branch ? ` · 📍 ${d.branch}` : ''}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span style={fontMono} className="text-sm font-semibold">{money(d.amount)}</span>
+                          <Badge tone={d.status === 'confirmed' ? 'mint' : d.status === 'rejected' ? 'danger' : 'amber'}>
+                            {d.status === 'confirmed' ? 'Konfime' : d.status === 'rejected' ? 'Refize' : 'Ap tann'}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {depositView === 'pending' && (
               <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 Verifye referans lan ak resi kach la anvan ou konfime yon depo biwo.
               </div>
+              )}
             </div>
           )}
 
           {nav === 'withdrawals' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Retrait</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Konfime oswa rejte demand retrè yo. Yon retrè refize remèt lajan an bay kliyan an.</p>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Retrait</h1>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>Konfime oswa rejte demand retrè yo. Yon retrè refize remèt lajan an bay kliyan an.</p>
+                </div>
+                <button onClick={() => withdrawalView === 'pending' ? loadWithdrawals(token) : loadWithdrawalHistory()} aria-label="Rafrechi"
+                  className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                  style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                  <RefreshCw size={14} color={C.muted} style={(loadingWithdrawals || loadingWithdrawalHistory) ? { animation: 'spin 0.8s linear infinite' } : undefined} />
+                </button>
+              </div>
 
+              <div className="flex items-center gap-1.5" style={{ marginTop: 16 }}>
+                <button onClick={() => setWithdrawalView('pending')}
+                  className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
+                    background: withdrawalView === 'pending' ? C.navy : C.card, color: withdrawalView === 'pending' ? '#fff' : C.muted,
+                    border: `1px solid ${withdrawalView === 'pending' ? C.navy : C.border}` }}>
+                  Ap tann
+                </button>
+                <button onClick={() => { setWithdrawalView('history'); if (withdrawalHistory.length === 0) loadWithdrawalHistory(); }}
+                  className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
+                    background: withdrawalView === 'history' ? C.navy : C.card, color: withdrawalView === 'history' ? '#fff' : C.muted,
+                    border: `1px solid ${withdrawalView === 'history' ? C.navy : C.border}` }}>
+                  Istorik
+                </button>
+              </div>
+
+              {withdrawalView === 'pending' && (
               <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                 {loadingWithdrawals ? (
                   <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
@@ -1129,6 +1255,42 @@ export default function BlicPayAdmin() {
                   );
                 })}
               </div>
+              )}
+
+              {withdrawalView === 'history' && (
+                <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+                  {loadingWithdrawalHistory ? (
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Ap chaje...</p>
+                  ) : withdrawalHistory.length === 0 ? (
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen istorik toujou.</p>
+                  ) : withdrawalHistory.map((w, i) => {
+                    const M = methodIcons[w.method] || { icon: DollarSign, color: C.muted, label: w.method };
+                    return (
+                      <div key={w.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+                        style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none', opacity: w.status === 'rejected' ? 0.55 : 1 }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                            {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={14} color="#fff" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold">{w.user}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{M.label} · {w.date}{w.branch ? ` · 📍 ${w.branch}` : ''}</p>
+                            {w.destinationNumber && (
+                              <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>→ {w.destinationNumber} ({w.destinationName})</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span style={{ ...fontMono, color: C.danger }} className="text-sm font-semibold">−{money(w.amount)}</span>
+                          <Badge tone={w.status === 'confirmed' ? 'mint' : w.status === 'rejected' ? 'danger' : 'amber'}>
+                            {w.status === 'confirmed' ? 'Konfime' : w.status === 'rejected' ? 'Refize' : 'Ap tann'}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -1398,6 +1560,37 @@ export default function BlicPayAdmin() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {nav === 'solPayouts' && (
+            <div className="fadein">
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Pòch Sòl resevwa</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>Istorik tout pòch Sòl ki reyèlman peye — chak fwa yon manm resevwa nan wotasyon an.</p>
+              <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+                {loadingSolPayouts ? (
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Ap chaje...</p>
+                ) : solPayouts.length === 0 ? (
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen okenn pòch peye toujou.</p>
+                ) : solPayouts.map((p, i) => (
+                  <div key={p.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+                    style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: C.bg }}>
+                        <HandCoins size={15} color={C.gold} />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold">{p.user.fullName}</p>
+                        <p className="text-xs mt-0.5" style={{ color: C.muted }}>{p.user.phone} · {new Date(p.paidAt).toLocaleString('fr-FR')}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span style={fontMono} className="text-sm font-semibold" >{money(p.amount)}</span>
+                      <p className="text-xs mt-0.5" style={{ color: C.muted }}>{p.group.name} · pozisyon #{p.period + 1}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
