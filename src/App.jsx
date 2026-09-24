@@ -169,6 +169,7 @@ export default function BlicPayAdmin() {
   const [solPayouts, setSolPayouts] = useState([]);
   const [loadingSolPayouts, setLoadingSolPayouts] = useState(false);
   const [reserves, setReserves] = useState([]);
+  const [exchangeRate, setExchangeRate] = useState(null);
   const [editingReserveMethod, setEditingReserveMethod] = useState(null);
   const [reserveInput, setReserveInput] = useState('');
   const [savingReserve, setSavingReserve] = useState(false);
@@ -314,6 +315,15 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); }
   }
 
+  async function loadExchangeRate(authToken = token) {
+    try {
+      const { rate, rateDate } = await apiFetch('/admin/exchange-rate', { token: authToken });
+      setExchangeRate({ rate, rateDate });
+    } catch (err) {
+      // Silans — se yon akseswa afichay, pa yon fonksyonalite kritik.
+    }
+  }
+
   async function saveReserve(method) {
     const numeric = Number(reserveInput);
     if (!Number.isFinite(numeric) || numeric < 0) { flash('Balans lan pa valab.'); return; }
@@ -335,8 +345,9 @@ export default function BlicPayAdmin() {
       const { withdrawals: ws } = await apiFetch('/admin/withdrawals/pending', { token: authToken });
       setWithdrawals(ws.map((w) => ({
         id: w.id, user: w.user.fullName, phone: w.user.phone, method: w.method,
-        amount: w.amount, reference: w.reference, date: new Date(w.createdAt).toLocaleString('fr-FR'),
-        destinationNumber: w.destinationNumber, destinationName: w.destinationName, branch: w.branch, clientId: w.user.clientId,
+        amount: w.amount, fee: w.fee || 0, reference: w.reference, date: new Date(w.createdAt).toLocaleString('fr-FR'),
+        destinationNumber: w.destinationNumber, destinationName: w.destinationName, branch: w.branch,
+        clientId: w.user.clientId, balance: w.user.balance,
       })));
     } catch (err) { flash(err.message); } finally { setLoadingWithdrawals(false); }
   }
@@ -768,6 +779,7 @@ export default function BlicPayAdmin() {
       setAdmin(user);
       setNav(user.role === 'agent' ? 'pending' : 'overview');
       await loadPending(newToken);
+      if (user.role !== 'agent') loadExchangeRate(newToken);
     } catch (err) {
       setLoginError(err.message);
     } finally {
@@ -879,10 +891,10 @@ export default function BlicPayAdmin() {
   const pendingLoansCount = loans.filter((l) => l.status === 'pending').length;
 
   const NAV_ITEMS_ALL = [
-    { id: 'overview', label: 'Apèsi', icon: LayoutGrid, adminOnly: true },
+    { id: 'overview', label: 'Apèsi', icon: LayoutGrid, onOpen: () => loadExchangeRate(), adminOnly: true },
     { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
     { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
-    { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => loadWithdrawals() },
+    { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
     { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
     { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: false },
     { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
@@ -1035,10 +1047,20 @@ export default function BlicPayAdmin() {
 
               <div className="mt-6 p-6 rounded-2xl relative overflow-hidden" style={{ background: C.navy }}>
                 <p className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>TOTAL TOUT ANTRE YO</p>
-                <p style={{ ...fontDisplay, fontSize: 34, fontWeight: 800, color: '#fff', marginTop: 6 }}>
-                  {money(totalPendingAmount + totalGoalsSaved + totalTransferVolume)}
+                <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 6 }}>
+                  <p style={{ ...fontDisplay, fontSize: 34, fontWeight: 800, color: '#fff' }}>
+                    {money(totalPendingAmount + totalGoalsSaved + totalTransferVolume)}
+                  </p>
+                  {exchangeRate && (
+                    <span style={{ ...fontMono, fontSize: 14, color: C.gold, fontWeight: 700 }}>
+                      ≈ ${((totalPendingAmount + totalGoalsSaved + totalTransferVolume) / exchangeRate.rate).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.75)' }}>
+                  Depo + lajan nan Objektif + volim Transfè
+                  {exchangeRate && ` · Tal BRH: 1 USD = ${exchangeRate.rate} HTG (${exchangeRate.rateDate})`}
                 </p>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.75)' }}>Depo + lajan nan Objektif + volim Transfè</p>
               </div>
 
               <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -1246,65 +1268,207 @@ export default function BlicPayAdmin() {
                 </button>
               </div>
 
-              {withdrawalView === 'pending' && (
-              <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
-                {loadingWithdrawals ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
-                ) : withdrawals.length === 0 ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen retrè k'ap tann.</p>
-                ) : withdrawals.map((w, i) => {
-                  const M = methodIcons[w.method] || { icon: DollarSign, color: C.muted, label: w.method };
-                  return (
-                    <div key={w.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
-                      style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
-                          {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={16} color="#fff" />}
+              {withdrawalView === 'pending' && (() => {
+                const totalPending = withdrawals.reduce((s, w) => s + w.amount, 0);
+                const biggestPending = withdrawals.length ? Math.max(...withdrawals.map((w) => w.amount)) : 0;
+                const moncashReserve = reserves.find((r) => r.method === 'moncash')?.balance || 0;
+                const natcashReserve = reserves.find((r) => r.method === 'natcash')?.balance || 0;
+                const proofOk = !!withdrawalProofFile;
+                return (
+                <>
+                {/* Metrik reyèl — pa gen chif envante */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3" style={{ marginTop: 20 }}>
+                  <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Total Ap Tann</p>
+                    <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: C.ink, marginTop: 4 }}>{money(totalPending)}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{withdrawals.length} tranzaksyon</p>
+                  </div>
+                  <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Rezèv MonCash</p>
+                    <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: C.ink, marginTop: 4 }}>{money(moncashReserve)}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>Mete ajou alamen</p>
+                  </div>
+                  <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Rezèv NatCash</p>
+                    <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: '#1C6FBF', marginTop: 4 }}>{money(natcashReserve)}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>Mete ajou alamen</p>
+                  </div>
+                  <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Pi Gwo Demand</p>
+                    <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: C.navy, marginTop: 4 }}>{money(biggestPending)}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>Nan fil datant lan</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-5" style={{ marginTop: 20 }}>
+                  {/* Kolòn gòch — Lis */}
+                  <div className="xl:col-span-7">
+                    <div className="bg-white border rounded-lg overflow-hidden" style={{ borderColor: C.border }}>
+                      {loadingWithdrawals ? (
+                        <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                      ) : withdrawals.length === 0 ? (
+                        <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Pa gen retrè k'ap tann.</p>
+                      ) : (
+                        <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
+                              <Th>Kliyan</Th>
+                              <Th>Metòd & Kont</Th>
+                              <Th align="right">Montan</Th>
+                              <Th align="right"></Th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            {withdrawals.map((w) => {
+                              const M = methodIcons[w.method] || { icon: DollarSign, color: C.muted, label: w.method };
+                              const selected = confirmingWithdrawal?.id === w.id;
+                              return (
+                                <tr key={w.id} onClick={() => { setConfirmingWithdrawal(w); setWithdrawalProofFile(null); }}
+                                  style={{ cursor: 'pointer', background: selected ? '#FFFDF9' : C.card, borderLeft: selected ? `3px solid ${C.gold}` : '3px solid transparent', borderTop: `1px solid ${C.border}` }}>
+                                  <Td>
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                                        {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={13} color="#fff" />}
+                                      </div>
+                                      <div>
+                                        <p className="font-bold" style={{ color: C.ink }}>{w.user}</p>
+                                        <p style={{ ...fontMono, fontSize: 11, color: C.muted }}>{w.phone}</p>
+                                      </div>
+                                    </div>
+                                  </Td>
+                                  <Td>
+                                    <Badge tone="amber">{M.label}</Badge>
+                                    {w.destinationNumber && <p style={{ ...fontMono, fontSize: 11, fontWeight: 700, color: C.ink, marginTop: 4 }}>{w.destinationNumber}</p>}
+                                    {w.destinationNumber && (
+                                      namesMatch(w.user, w.destinationName)
+                                        ? <p className="text-[10px]" style={{ color: '#2B5842' }}>✓ Non korespondan</p>
+                                        : <p className="text-[10px]" style={{ color: '#8E341F' }}>⚠ Non diferan</p>
+                                    )}
+                                  </Td>
+                                  <Td align="right">
+                                    <p style={{ ...fontMono, fontWeight: 700, fontSize: 13, color: C.danger }}>−{money(w.amount)}</p>
+                                    <p className="text-[10px]" style={{ color: C.muted }}>{w.date}</p>
+                                  </Td>
+                                  <Td align="right">
+                                    <button onClick={(e) => { e.stopPropagation(); rejectWithdrawal(w.id); }}
+                                      className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ border: `1px solid ${C.border}` }} aria-label="Rejte">
+                                      <X size={13} color={C.danger} />
+                                    </button>
+                                  </Td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Kolòn dwat — Detay & Aksyon */}
+                  <div className="xl:col-span-5">
+                    {!confirmingWithdrawal ? (
+                      <div className="bg-white border rounded-lg flex flex-col items-center justify-center text-center" style={{ borderColor: C.border, padding: '48px 24px' }}>
+                        <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
+                          <Search size={18} color={C.muted} />
                         </div>
-                        <div>
-                          <p className="text-sm font-semibold">{w.user}</p>
-                          <p className="text-xs mt-0.5" style={{ color: C.muted }}>{w.phone} · {w.date}</p>
-                          <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{w.reference}</p>
-                          {w.destinationNumber && (
-                            <div className="flex items-center gap-1.5 mt-0.5">
-                              <p className="text-xs" style={{ ...fontMono, color: C.navy }}>→ {w.destinationNumber} ({w.destinationName})</p>
-                              {namesMatch(w.user, w.destinationName) ? (
-                                <Badge tone="mint">Non OK</Badge>
+                        <p className="text-sm" style={{ color: C.muted }}>Chwazi yon retrè nan lis la pou enspekte epi konfime li.</p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg" style={{ background: '#fff', border: `2px solid ${C.navy}`, padding: 20 }}>
+                        <div className="flex items-center justify-between" style={{ paddingBottom: 14, borderBottom: `1px solid ${C.border}` }}>
+                          <div>
+                            <p style={{ ...fontMono, fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>Enspeksyon retrè</p>
+                            <p className="text-base font-extrabold" style={{ color: C.navy }}>{confirmingWithdrawal.reference}</p>
+                          </div>
+                          <Badge tone="amber">Mande Validasyon</Badge>
+                        </div>
+
+                        <div className="rounded-lg" style={{ background: C.bg, border: `1px solid ${C.border}`, padding: 14, marginTop: 14 }}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+                                <span className="text-xs font-bold" style={{ color: C.navy }}>{initials(confirmingWithdrawal.user)}</span>
+                              </div>
+                              <div>
+                                <p className="text-sm font-extrabold" style={{ color: C.ink }}>{confirmingWithdrawal.user}</p>
+                                <p style={{ ...fontMono, fontSize: 11, color: C.muted }}>{confirmingWithdrawal.phone}</p>
+                                {confirmingWithdrawal.balance != null && (
+                                  <p style={{ ...fontMono, fontSize: 10, color: C.muted }}>Balans: <span style={{ fontWeight: 700, color: C.ink }}>{money(confirmingWithdrawal.balance)}</span></p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {confirmingWithdrawal.destinationNumber && (
+                            <div className="flex items-center justify-between text-xs" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+                              <span style={{ color: C.muted }}>Non destinasyon:</span>
+                              {namesMatch(confirmingWithdrawal.user, confirmingWithdrawal.destinationName) ? (
+                                <span className="font-bold flex items-center gap-1" style={{ color: '#2B5842' }}>
+                                  <Check size={13} /> {confirmingWithdrawal.destinationName} — Korespondan
+                                </span>
                               ) : (
-                                <Badge tone="amber">⚠ Non diferan</Badge>
+                                <span className="font-bold flex items-center gap-1" style={{ color: '#8E341F' }}>
+                                  ⚠ {confirmingWithdrawal.destinationName} — Diferan
+                                </span>
                               )}
                             </div>
                           )}
-                          {w.method === 'biwo' && (
-                            <p className="text-xs mt-0.5" style={{ color: C.navy }}>
-                              {w.branch} · Kòd: <span style={{ ...fontMono, fontWeight: 700 }}>{w.clientId}</span>
-                            </p>
+                          {confirmingWithdrawal.method === 'biwo' && (
+                            <div className="text-xs" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.navy }}>
+                              {confirmingWithdrawal.branch} · Kòd kliyan: <span style={{ ...fontMono, fontWeight: 700 }}>{confirmingWithdrawal.clientId}</span>
+                            </div>
                           )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p style={{ ...fontMono, fontSize: 15, fontWeight: 600, color: C.danger }}>−{money(w.amount)}</p>
-                          <Badge tone="amber">{M.label}</Badge>
+
+                        <div className="text-xs" style={{ marginTop: 14 }}>
+                          <div className="flex justify-between" style={{ padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
+                            <span style={{ color: C.muted }}>Montan mande:</span>
+                            <span style={{ ...fontMono, fontWeight: 700, color: C.ink }}>{money(confirmingWithdrawal.amount)}</span>
+                          </div>
+                          <div className="flex justify-between" style={{ padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
+                            <span style={{ color: C.muted }}>Frè:</span>
+                            <span style={{ ...fontMono, color: C.danger }}>−{money(confirmingWithdrawal.fee || 0)}</span>
+                          </div>
+                          <div className="flex justify-between items-baseline rounded-md" style={{ padding: '8px 10px', background: C.bg, marginTop: 4 }}>
+                            <span className="text-xs font-bold uppercase" style={{ color: C.navy }}>Nèt pou debouse:</span>
+                            <span style={{ ...fontMono, fontWeight: 800, fontSize: 16, color: '#2B5842' }}>{money(confirmingWithdrawal.amount)}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => rejectWithdrawal(w.id)}
-                            className="bp-btn w-9 h-9 rounded-lg flex items-center justify-center"
-                            style={{ border: `1px solid ${C.border}` }} aria-label="Rejte">
-                            <X size={15} color={C.danger} />
+
+                        <div style={{ marginTop: 14 }}>
+                          <label className="text-xs font-bold uppercase" style={{ color: C.danger }}>Prèv ou voye lajan an (OBLIGATWA)</label>
+                          <input type="file" accept="image/*" onChange={(e) => setWithdrawalProofFile(e.target.files?.[0] || null)}
+                            className="w-full mt-1.5 text-xs" />
+                          {withdrawalProofFile && (
+                            <p className="text-[11px] mt-1" style={{ color: '#2B5842' }}>✓ {withdrawalProofFile.name}</p>
+                          )}
+                        </div>
+
+                        <div className="flex flex-col gap-2" style={{ marginTop: 16 }}>
+                          <button
+                            onClick={async () => {
+                              setConfirmingWithdrawalBusy(true);
+                              await confirmWithdrawal(confirmingWithdrawal.id, withdrawalProofFile);
+                              setConfirmingWithdrawalBusy(false);
+                              setConfirmingWithdrawal(null);
+                            }}
+                            disabled={confirmingWithdrawalBusy || !proofOk}
+                            className="bp-btn w-full py-3 rounded-lg text-sm font-bold text-white"
+                            style={{ background: C.navy, opacity: (confirmingWithdrawalBusy || !proofOk) ? 0.5 : 1 }}>
+                            {confirmingWithdrawalBusy ? 'Ap konfime...' : `Apwouve & Debouse (${money(confirmingWithdrawal.amount)})`}
                           </button>
-                          <button onClick={() => { setConfirmingWithdrawal(w); setWithdrawalProofFile(null); }}
-                            className="bp-btn px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
-                            style={{ background: C.mint, color: '#fff' }}>
-                            <Check size={13} /> Konfime
+                          <button
+                            onClick={() => { rejectWithdrawal(confirmingWithdrawal.id); setConfirmingWithdrawal(null); }}
+                            className="bp-btn w-full py-2 rounded-lg text-xs font-bold" style={{ background: '#FBEBE6', color: C.danger, border: '1px solid rgba(181,72,46,0.25)' }}>
+                            Rejte demand lan
                           </button>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-              )}
+                    )}
+                  </div>
+                </div>
+                </>
+                );
+              })()}
 
               {withdrawalView === 'history' && (
                 <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
@@ -2759,74 +2923,6 @@ export default function BlicPayAdmin() {
           </>
         );
       })()}
-
-      {confirmingWithdrawal && (
-        <>
-          <div onClick={() => setConfirmingWithdrawal(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 52 }} />
-          <div className="fadein" style={{
-            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 400,
-            background: C.card, borderRadius: 16, zIndex: 53, padding: 24,
-          }}>
-            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#F3E8D2' }}>
-              <AlertCircle size={16} color="#8A6423" className="shrink-0 mt-0.5" />
-              <p className="text-xs" style={{ color: '#8A6423' }}>
-                Verifye ou VOYE lajan an anvan ou konfime — aksyon sa a p ap ka anile.
-              </p>
-            </div>
-            <p className="text-sm font-semibold">Konfime retrè {confirmingWithdrawal.user}?</p>
-            <p className="text-xs mt-1" style={{ color: C.muted }}>
-              {money(confirmingWithdrawal.amount)} · {methodIcons[confirmingWithdrawal.method]?.label || confirmingWithdrawal.method}
-            </p>
-            {confirmingWithdrawal.destinationNumber && (
-              <div className="flex items-center gap-1.5 mt-2">
-                <p className="text-sm font-semibold" style={{ ...fontMono, color: C.navy }}>→ {confirmingWithdrawal.destinationNumber} ({confirmingWithdrawal.destinationName})</p>
-                {namesMatch(confirmingWithdrawal.user, confirmingWithdrawal.destinationName) ? (
-                  <Badge tone="mint">Non OK</Badge>
-                ) : (
-                  <Badge tone="amber">⚠ Non diferan</Badge>
-                )}
-              </div>
-            )}
-            {confirmingWithdrawal.method === 'biwo' && (
-              <p className="text-sm mt-2" style={{ color: C.navy }}>
-                {confirmingWithdrawal.branch} · Kòd kliyan: <span style={{ ...fontMono, fontWeight: 700 }}>{confirmingWithdrawal.clientId}</span>
-              </p>
-            )}
-
-            {(() => {
-              const proofRequired = true;
-              const blocked = proofRequired && !withdrawalProofFile;
-              return (
-                <>
-                  <label className="block mt-4 text-xs font-semibold" style={{ color: proofRequired ? C.danger : C.muted }}>
-                    PRÈV OU VOYE LAJAN AN (OBLIGATWA)
-                  </label>
-                  <input type="file" accept="image/*" onChange={(e) => setWithdrawalProofFile(e.target.files?.[0] || null)}
-                    className="w-full mt-1.5 text-xs" />
-
-                  <div className="flex gap-2.5 mt-5">
-                    <button onClick={() => setConfirmingWithdrawal(null)}
-                      className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: C.bg, color: C.muted }}>
-                      Anile
-                    </button>
-                    <button
-                      onClick={async () => {
-                        setConfirmingWithdrawalBusy(true);
-                        await confirmWithdrawal(confirmingWithdrawal.id, withdrawalProofFile);
-                        setConfirmingWithdrawalBusy(false);
-                        setConfirmingWithdrawal(null);
-                      }}
-                      disabled={confirmingWithdrawalBusy || blocked}
-                      className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint, opacity: (confirmingWithdrawalBusy || blocked) ? 0.6 : 1 }}>
-                      {confirmingWithdrawalBusy ? 'Ap konfime...' : 'Wi, konfime li'}
-                    </button>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </>
-      )}
 
       {confirmingDeposit && (
         <>
