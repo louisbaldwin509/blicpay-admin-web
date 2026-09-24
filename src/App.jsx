@@ -67,6 +67,13 @@ function money(n) {
 function initials(name) {
   return (name || '').split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
 }
+// Konpare non yon kont kliyan (w.user) ak non li antre kòm destinasyon retrè
+// a (w.destinationName) — jis pou avèti ajan an si yo diferan, PA yon
+// verifikasyon otomatik reyèl (ni MonCash ni NatCash pa bay API pou sa).
+function namesMatch(a, b) {
+  const norm = (s) => (s || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return norm(a) === norm(b);
+}
 
 function Logo({ size = 28 }) {
   return (
@@ -161,6 +168,10 @@ export default function BlicPayAdmin() {
   const [withdrawalView, setWithdrawalView] = useState('pending'); // 'pending' | 'history'
   const [solPayouts, setSolPayouts] = useState([]);
   const [loadingSolPayouts, setLoadingSolPayouts] = useState(false);
+  const [reserves, setReserves] = useState([]);
+  const [editingReserveMethod, setEditingReserveMethod] = useState(null);
+  const [reserveInput, setReserveInput] = useState('');
+  const [savingReserve, setSavingReserve] = useState(false);
   const [confirmed, setConfirmed] = useState([]);
 
   // Retrait
@@ -294,6 +305,28 @@ export default function BlicPayAdmin() {
       const { payouts } = await apiFetch('/admin/sol/payouts', { token: authToken });
       setSolPayouts(payouts);
     } catch (err) { flash(err.message); } finally { setLoadingSolPayouts(false); }
+  }
+
+  async function loadReserves(authToken = token) {
+    try {
+      const { reserves: r } = await apiFetch('/admin/reserves', { token: authToken });
+      setReserves(r);
+    } catch (err) { flash(err.message); }
+  }
+
+  async function saveReserve(method) {
+    const numeric = Number(reserveInput);
+    if (!Number.isFinite(numeric) || numeric < 0) { flash('Balans lan pa valab.'); return; }
+    setSavingReserve(true);
+    try {
+      const { reserve } = await apiFetch(`/admin/reserves/${method}`, { method: 'PATCH', token, body: { balance: numeric } });
+      setReserves((rs) => {
+        const others = rs.filter((r) => r.method !== method);
+        return [...others, reserve].sort((a, b) => a.method.localeCompare(b.method));
+      });
+      setEditingReserveMethod(null);
+      flash('Rezèv la mete ajou.');
+    } catch (err) { flash(err.message); } finally { setSavingReserve(false); }
   }
 
   async function loadWithdrawals(authToken = token) {
@@ -847,7 +880,7 @@ export default function BlicPayAdmin() {
 
   const NAV_ITEMS_ALL = [
     { id: 'overview', label: 'Apèsi', icon: LayoutGrid, adminOnly: true },
-    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => loadFinance(), adminOnly: false },
+    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
     { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
     { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => loadWithdrawals() },
     { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
@@ -1224,7 +1257,14 @@ export default function BlicPayAdmin() {
                           <p className="text-xs mt-0.5" style={{ color: C.muted }}>{w.phone} · {w.date}</p>
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{w.reference}</p>
                           {w.destinationNumber && (
-                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>→ {w.destinationNumber} ({w.destinationName})</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <p className="text-xs" style={{ ...fontMono, color: C.navy }}>→ {w.destinationNumber} ({w.destinationName})</p>
+                              {namesMatch(w.user, w.destinationName) ? (
+                                <Badge tone="mint">Non OK</Badge>
+                              ) : (
+                                <Badge tone="amber">⚠ Non diferan</Badge>
+                              )}
+                            </div>
                           )}
                           {w.method === 'biwo' && (
                             <p className="text-xs mt-0.5" style={{ color: C.navy }}>
@@ -1276,7 +1316,10 @@ export default function BlicPayAdmin() {
                             <p className="text-sm font-semibold">{w.user}</p>
                             <p className="text-xs mt-0.5" style={{ color: C.muted }}>{M.label} · {w.date}{w.branch ? ` · 📍 ${w.branch}` : ''}</p>
                             {w.destinationNumber && (
-                              <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>→ {w.destinationNumber} ({w.destinationName})</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <p className="text-xs" style={{ ...fontMono, color: C.muted }}>→ {w.destinationNumber} ({w.destinationName})</p>
+                                {!namesMatch(w.user, w.destinationName) && <Badge tone="amber">⚠</Badge>}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2199,6 +2242,53 @@ export default function BlicPayAdmin() {
                 ))}
               </div>
 
+              {/* Rezèv manyèl pa metòd — MonCash/NatCash pa gen API balans, sipè admin mete l ajou alamen */}
+              <div className="rounded-2xl" style={{ marginTop: 18, padding: '16px 18px', background: C.card, border: `1px solid ${C.border}` }}>
+                <p className="text-xs font-semibold" style={{ color: C.muted, marginBottom: 10 }}>REZÈV OPERASYONÈL (mete ajou alamen)</p>
+                <div className="grid grid-cols-2" style={{ gap: 12 }}>
+                  {['moncash', 'natcash'].map((methodId) => {
+                    const reserve = reserves.find((r) => r.method === methodId);
+                    const M = methodIcons[methodId];
+                    const isEditing = editingReserveMethod === methodId;
+                    return (
+                      <div key={methodId} className="rounded-xl flex items-center justify-between" style={{ padding: '12px 14px', background: C.bg, border: `1px solid ${C.border}` }}>
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-full flex items-center justify-center overflow-hidden" style={{ background: '#fff', border: `1px solid ${C.border}` }}>
+                            {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={14} color={M.color} />}
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold" style={{ color: C.muted }}>{M.label}</p>
+                            {isEditing ? (
+                              <input autoFocus value={reserveInput} onChange={(e) => setReserveInput(e.target.value)} type="number"
+                                className="mt-0.5 text-sm rounded-md" style={{ ...fontMono, width: 130, padding: '3px 6px', border: `1px solid ${C.border}` }} />
+                            ) : (
+                              <p style={fontMono} className="text-sm font-bold">{money(reserve?.balance || 0)}</p>
+                            )}
+                          </div>
+                        </div>
+                        {admin?.role !== 'agent' && (
+                          isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => setEditingReserveMethod(null)} className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.card }}>
+                                <X size={12} color={C.muted} />
+                              </button>
+                              <button onClick={() => saveReserve(methodId)} disabled={savingReserve} className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center text-white" style={{ background: C.mint, opacity: savingReserve ? 0.6 : 1 }}>
+                                <Check size={12} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button onClick={() => { setEditingReserveMethod(methodId); setReserveInput(String(reserve?.balance || 0)); }}
+                              className="bp-btn text-xs font-semibold px-2.5 py-1.5 rounded-md" style={{ background: C.card, border: `1px solid ${C.border}`, color: C.navy }}>
+                              Modifye
+                            </button>
+                          )
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* KPI yo — vi jeneral an yon kout je */}
               <div className={`grid grid-cols-2 ${admin?.role === 'agent' ? 'lg:grid-cols-3' : 'lg:grid-cols-5'}`} style={{ gap: 12, marginTop: 18 }}>
                 {admin?.role !== 'agent' && (
@@ -2679,7 +2769,14 @@ export default function BlicPayAdmin() {
               {money(confirmingWithdrawal.amount)} · {methodIcons[confirmingWithdrawal.method]?.label || confirmingWithdrawal.method}
             </p>
             {confirmingWithdrawal.destinationNumber && (
-              <p className="text-sm mt-2 font-semibold" style={{ ...fontMono, color: C.navy }}>→ {confirmingWithdrawal.destinationNumber} ({confirmingWithdrawal.destinationName})</p>
+              <div className="flex items-center gap-1.5 mt-2">
+                <p className="text-sm font-semibold" style={{ ...fontMono, color: C.navy }}>→ {confirmingWithdrawal.destinationNumber} ({confirmingWithdrawal.destinationName})</p>
+                {namesMatch(confirmingWithdrawal.user, confirmingWithdrawal.destinationName) ? (
+                  <Badge tone="mint">Non OK</Badge>
+                ) : (
+                  <Badge tone="amber">⚠ Non diferan</Badge>
+                )}
+              </div>
             )}
             {confirmingWithdrawal.method === 'biwo' && (
               <p className="text-sm mt-2" style={{ color: C.navy }}>
@@ -2687,27 +2784,37 @@ export default function BlicPayAdmin() {
               </p>
             )}
 
-            <label className="block mt-4 text-xs font-semibold" style={{ color: C.muted }}>PRÈV OU VOYE LAJAN AN (opsyonèl)</label>
-            <input type="file" accept="image/*" onChange={(e) => setWithdrawalProofFile(e.target.files?.[0] || null)}
-              className="w-full mt-1.5 text-xs" />
+            {(() => {
+              const proofRequired = true;
+              const blocked = proofRequired && !withdrawalProofFile;
+              return (
+                <>
+                  <label className="block mt-4 text-xs font-semibold" style={{ color: proofRequired ? C.danger : C.muted }}>
+                    PRÈV OU VOYE LAJAN AN (OBLIGATWA)
+                  </label>
+                  <input type="file" accept="image/*" onChange={(e) => setWithdrawalProofFile(e.target.files?.[0] || null)}
+                    className="w-full mt-1.5 text-xs" />
 
-            <div className="flex gap-2.5 mt-5">
-              <button onClick={() => setConfirmingWithdrawal(null)}
-                className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: C.bg, color: C.muted }}>
-                Anile
-              </button>
-              <button
-                onClick={async () => {
-                  setConfirmingWithdrawalBusy(true);
-                  await confirmWithdrawal(confirmingWithdrawal.id, withdrawalProofFile);
-                  setConfirmingWithdrawalBusy(false);
-                  setConfirmingWithdrawal(null);
-                }}
-                disabled={confirmingWithdrawalBusy}
-                className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint, opacity: confirmingWithdrawalBusy ? 0.7 : 1 }}>
-                {confirmingWithdrawalBusy ? 'Ap konfime...' : 'Wi, konfime li'}
-              </button>
-            </div>
+                  <div className="flex gap-2.5 mt-5">
+                    <button onClick={() => setConfirmingWithdrawal(null)}
+                      className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: C.bg, color: C.muted }}>
+                      Anile
+                    </button>
+                    <button
+                      onClick={async () => {
+                        setConfirmingWithdrawalBusy(true);
+                        await confirmWithdrawal(confirmingWithdrawal.id, withdrawalProofFile);
+                        setConfirmingWithdrawalBusy(false);
+                        setConfirmingWithdrawal(null);
+                      }}
+                      disabled={confirmingWithdrawalBusy || blocked}
+                      className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint, opacity: (confirmingWithdrawalBusy || blocked) ? 0.6 : 1 }}>
+                      {confirmingWithdrawalBusy ? 'Ap konfime...' : 'Wi, konfime li'}
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </>
       )}
