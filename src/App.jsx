@@ -94,16 +94,16 @@ function Logo({ size = 28 }) {
 
 function Badge({ children, tone = 'muted' }) {
   const map = {
-    muted: { bg: '#EEF1F6', fg: C.muted },
-    mint: { bg: '#E9F0EA', fg: C.mint },
-    amber: { bg: '#F3E8D2', fg: '#8A6423' },
-    navy: { bg: '#EFE7D8', fg: C.navy },
-    premium: { bg: '#F4EBFF', fg: '#6D3FD1' },
-    danger: { bg: '#F5E5DF', fg: C.danger },
+    muted: { bg: 'rgba(111,106,94,0.10)', fg: C.muted, border: 'rgba(111,106,94,0.22)' },
+    mint: { bg: 'rgba(61,122,92,0.10)', fg: '#2B5842', border: 'rgba(61,122,92,0.25)' },
+    amber: { bg: 'rgba(185,134,47,0.12)', fg: '#8A6423', border: 'rgba(185,134,47,0.28)' },
+    navy: { bg: 'rgba(15,45,82,0.08)', fg: C.navy, border: 'rgba(15,45,82,0.20)' },
+    premium: { bg: 'rgba(109,63,209,0.10)', fg: '#532DA8', border: 'rgba(109,63,209,0.25)' },
+    danger: { bg: 'rgba(181,72,46,0.10)', fg: '#8E341F', border: 'rgba(181,72,46,0.25)' },
   };
   const s = map[tone];
   return (
-    <span className="px-2.5 py-1 rounded-full text-xs font-semibold" style={{ background: s.bg, color: s.fg }}>
+    <span className="px-2 py-0.5 text-xs font-semibold" style={{ background: s.bg, color: s.fg, border: `1px solid ${s.border}`, borderRadius: 4, letterSpacing: 0.2 }}>
       {children}
     </span>
   );
@@ -111,9 +111,9 @@ function Badge({ children, tone = 'muted' }) {
 
 function StatCard({ label, value, sub, accent }) {
   return (
-    <div className="rounded-xl relative overflow-hidden" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '18px 18px 16px', boxShadow: '0 1px 3px rgba(11,27,51,0.05)' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: accent || C.navy }} />
-      <p className="text-xs font-medium" style={{ color: C.muted }}>{label}</p>
+    <div className="rounded-lg relative overflow-hidden" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '18px 18px 16px' }}>
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent || C.navy }} />
+      <p className="text-xs font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.5 }}>{label}</p>
       <p className="mt-1.5" style={{ ...fontDisplay, fontSize: 24, fontWeight: 800, color: C.ink }}>{value}</p>
       {sub && <p className="mt-0.5 text-xs" style={{ color: C.muted }}>{sub}</p>}
     </div>
@@ -121,14 +121,14 @@ function StatCard({ label, value, sub, accent }) {
 }
 
 function Th({ children, align }) {
-  return <th style={{ textAlign: align || 'left', fontSize: 11, fontWeight: 700, color: C.muted, padding: '10px 14px', letterSpacing: 0.3, textTransform: 'uppercase' }}>{children}</th>;
+  return <th style={{ textAlign: align || 'left', fontSize: 10.5, fontWeight: 700, color: C.muted, padding: '10px 14px', letterSpacing: 0.6, textTransform: 'uppercase' }}>{children}</th>;
 }
 function Td({ children, align }) {
-  return <td style={{ textAlign: align || 'left', fontSize: 13, padding: '12px 14px', borderTop: `1px solid ${C.border}` }}>{children}</td>;
+  return <td style={{ textAlign: align || 'left', fontSize: 12.5, padding: '11px 14px', borderTop: `1px solid ${C.border}` }}>{children}</td>;
 }
 function Table({ children }) {
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}`, background: C.card }}>
+    <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.border}`, background: C.card }}>
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>{children}</table>
     </div>
   );
@@ -914,7 +914,7 @@ export default function BlicPayAdmin() {
         <div style={{ position: 'absolute', top: -120, right: -80, width: 360, height: 360, borderRadius: '50%', background: 'rgba(185,134,47,0.08)' }} />
         <div style={{ position: 'absolute', bottom: -140, left: -100, width: 320, height: 320, borderRadius: '50%', background: 'rgba(44,143,176,0.08)' }} />
 
-        <div className="w-full max-w-sm rounded-2xl relative" style={{ background: C.card, padding: '32px 28px', boxShadow: '0 24px 48px rgba(0,0,0,0.28)' }}>
+        <div className="w-full max-w-sm rounded-lg relative" style={{ background: C.card, padding: '32px 28px', border: `1px solid ${C.navy}`, boxShadow: '0px 12px 32px -4px rgba(10,33,64,0.28)' }}>
           <div className="flex items-center gap-2">
             <Logo size={28} />
             <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 18, color: C.ink }}>
@@ -971,13 +971,22 @@ export default function BlicPayAdmin() {
       )}
 
       {/* barre navigasyon anlè — fikse, li rete vizib pandan kontni an defile */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep, borderBottom: '1px solid #061529' }}>
         <div className="flex items-center justify-between" style={{ padding: '16px 24px 14px' }}>
-          <div className="flex items-center gap-2">
-            <Logo size={24} />
-            <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15, color: '#fff' }}>
-              BLIC<span style={{ color: C.gold }}>Pay</span>
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Logo size={24} />
+              <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15, color: '#fff' }}>
+                BLIC<span style={{ color: C.gold }}>Pay</span>
+              </span>
+            </div>
+            <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold rounded" style={{
+              padding: '4px 10px', background: 'rgba(185,134,47,0.14)', color: '#e9c583',
+              border: '1px solid rgba(185,134,47,0.3)', letterSpacing: 0.2,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.gold, display: 'inline-block' }} />
+              {admin?.role === 'agent' ? `Ajan · ${admin?.branch || ''}` : 'Sipè Admin — Aksè Konplè'}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex items-center gap-2.5">
@@ -1002,10 +1011,10 @@ export default function BlicPayAdmin() {
         <div className="flex items-center flex-wrap" style={{ padding: '0 20px 10px', gap: 2 }}>
           {NAV_ITEMS.map((item) => (
             <button key={item.id} onClick={() => goTo(item)}
-              className="nav-item flex items-center gap-2 rounded-lg text-sm font-medium"
+              className="nav-item flex items-center gap-2 text-sm"
               style={{
                 padding: '8px 12px',
-                background: nav === item.id ? 'rgba(255,255,255,0.1)' : 'transparent',
+                fontWeight: nav === item.id ? 700 : 500,
                 color: nav === item.id ? '#fff' : 'rgba(255,255,255,0.55)',
                 borderBottom: nav === item.id ? `2px solid ${C.gold}` : '2px solid transparent',
               }}>
@@ -2428,7 +2437,7 @@ export default function BlicPayAdmin() {
 
               {/* Revni pa sous (egzistan deja) */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Revni pa sous</p>
-              <div className="rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, boxShadow: '0 1px 3px rgba(11,27,51,0.04)' }}>
+              <div className="rounded-lg" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                 {[
                   { label: 'Frè entegrasyon Sòl', sub: '1,5% sou pot total', value: financeData.breakdown.solIntegrationFees, accent: C.navy },
                   { label: 'Penalite reta Sòl', sub: 'Kotizasyon an reta', value: financeData.breakdown.solPenalties, accent: '#8A6423' },
