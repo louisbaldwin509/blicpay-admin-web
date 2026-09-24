@@ -154,6 +154,23 @@ export default function BlicPayAdmin() {
   React.useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, [nav]);
+
+  // Lè reyèl pou tèt anlè a — mete ajou chak segonn, se yon vrè lè aparèy la,
+  // pa yon done ki soti nan backend lan.
+  const [clock, setClock] = useState(new Date());
+  React.useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Rafrechi notifikasyon yo chak minit pandan sesyon an aktif — pa gen
+  // rezon rele API a pi souvan pase sa pou yon bagay ki pa vrèman "tan reyèl".
+  React.useEffect(() => {
+    if (!token) return;
+    const id = setInterval(() => loadNotifications(), 60000);
+    return () => clearInterval(id);
+  }, [token]);
+
   const [toast, setToast] = useState(null);
   const [query, setQuery] = useState('');
 
@@ -170,6 +187,9 @@ export default function BlicPayAdmin() {
   const [loadingSolPayouts, setLoadingSolPayouts] = useState(false);
   const [reserves, setReserves] = useState([]);
   const [exchangeRate, setExchangeRate] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifPanelOpen, setNotifPanelOpen] = useState(false);
   const [editingReserveMethod, setEditingReserveMethod] = useState(null);
   const [reserveInput, setReserveInput] = useState('');
   const [savingReserve, setSavingReserve] = useState(false);
@@ -322,6 +342,32 @@ export default function BlicPayAdmin() {
     } catch (err) {
       // Silans — se yon akseswa afichay, pa yon fonksyonalite kritik.
     }
+  }
+
+  async function loadNotifications(authToken = token) {
+    try {
+      const { notifications: n, unreadCount: c } = await apiFetch('/admin/notifications', { token: authToken });
+      setNotifications(n);
+      setUnreadCount(c);
+    } catch (err) {
+      // Silans — pa deranje admin an ak yon erè pou sa.
+    }
+  }
+
+  async function markNotificationRead(id) {
+    setNotifications((ns) => ns.map((n) => n.id === id ? { ...n, read: true } : n));
+    setUnreadCount((c) => Math.max(0, c - 1));
+    try {
+      await apiFetch(`/admin/notifications/${id}/read`, { method: 'PATCH', token });
+    } catch (err) { /* silans */ }
+  }
+
+  async function markAllNotificationsRead() {
+    setNotifications((ns) => ns.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    try {
+      await apiFetch('/admin/notifications/read-all', { method: 'POST', token });
+    } catch (err) { /* silans */ }
   }
 
   async function saveReserve(method) {
@@ -538,10 +584,10 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); } finally { setLoadingUsers(false); }
   }
 
-  async function loadFinance(p = financePeriod) {
+  async function loadFinance(p = financePeriod, authToken = token) {
     setLoadingFinance(true);
     try {
-      const data = await apiFetch(`/admin/finance/summary?period=${p}`, { token });
+      const data = await apiFetch(`/admin/finance/summary?period=${p}`, { token: authToken });
       setFinanceData(data);
     } catch (err) { flash(err.message); } finally { setLoadingFinance(false); }
   }
@@ -779,7 +825,8 @@ export default function BlicPayAdmin() {
       setAdmin(user);
       setNav(user.role === 'agent' ? 'pending' : 'overview');
       await loadPending(newToken);
-      if (user.role !== 'agent') loadExchangeRate(newToken);
+      if (user.role !== 'agent') { loadExchangeRate(newToken); loadFinance('all', newToken); loadReserves(newToken); }
+      loadNotifications(newToken);
     } catch (err) {
       setLoginError(err.message);
     } finally {
@@ -891,7 +938,7 @@ export default function BlicPayAdmin() {
   const pendingLoansCount = loans.filter((l) => l.status === 'pending').length;
 
   const NAV_ITEMS_ALL = [
-    { id: 'overview', label: 'Apèsi', icon: LayoutGrid, onOpen: () => loadExchangeRate(), adminOnly: true },
+    { id: 'overview', label: 'Apèsi', icon: LayoutGrid, onOpen: () => { loadExchangeRate(); loadFinance('all'); loadReserves(); }, adminOnly: true },
     { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
     { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
     { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
@@ -983,26 +1030,50 @@ export default function BlicPayAdmin() {
       )}
 
       {/* barre navigasyon anlè — fikse, li rete vizib pandan kontni an defile */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep, borderBottom: '1px solid #061529' }}>
-        <div className="flex items-center justify-between" style={{ padding: '16px 24px 14px' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep, borderBottom: '1px solid #0F2D52', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
+        <div className="flex items-center justify-between" style={{ padding: '9px 24px', borderBottom: '1px solid rgba(19,44,80,0.6)' }}>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Logo size={24} />
-              <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 15, color: '#fff' }}>
+            <div className="flex items-center gap-2.5">
+              <div className="rounded-lg flex items-center justify-center font-extrabold text-white" style={{ width: 30, height: 30, background: C.navy, border: `1px solid ${C.gold}` }}>B</div>
+              <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', letterSpacing: -0.2 }}>
                 BLIC<span style={{ color: C.gold }}>Pay</span>
               </span>
+              <span className="hidden lg:inline-block text-[10px] uppercase font-semibold rounded" style={{ ...fontMono, padding: '2px 7px', background: C.navy, color: '#9fb0c7', border: '1px solid #334', letterSpacing: 0.6 }}>
+                Panèl Admin
+              </span>
             </div>
-            <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold rounded" style={{
-              padding: '4px 10px', background: 'rgba(185,134,47,0.14)', color: '#e9c583',
-              border: '1px solid rgba(185,134,47,0.3)', letterSpacing: 0.2,
+
+            <div className="hidden md:block" style={{ width: 1, height: 16, background: '#334', margin: '0 4px' }} />
+
+            <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold rounded-full" style={{
+              padding: '3px 10px', background: 'rgba(185,134,47,0.16)', color: '#e9c583',
+              border: '1px solid rgba(185,134,47,0.35)', letterSpacing: 0.2,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.gold, display: 'inline-block' }} />
               {admin?.role === 'agent' ? `Ajan · ${admin?.branch || ''}` : 'Sipè Admin — Aksè Konplè'}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
+          <div className="flex items-center" style={{ gap: 18 }}>
+            <div className="hidden sm:block text-right">
+              <p style={{ ...fontMono, fontSize: 11, color: '#c7d0dd' }}>
+                {clock.toLocaleTimeString('fr-FR')} <span style={{ color: '#7a8aa3' }}>HTG (UTC-5)</span>
+              </p>
+              <p className="text-[10px]" style={{ color: '#7a8aa3' }}>{clock.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+            </div>
+
+            <button onClick={() => setNotifPanelOpen((o) => !o)} className="w-8 h-8 rounded-full flex items-center justify-center relative" style={{ background: 'rgba(255,255,255,0.1)' }}>
+              <Bell size={15} color="#fff" />
+              {unreadCount > 0 && (
+                <span className="absolute flex items-center justify-center text-white font-bold" style={{
+                  top: -1, right: -1, width: 15, height: 15, borderRadius: '50%', background: C.gold, fontSize: 9,
+                }}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            <div className="hidden sm:flex items-center gap-2.5" style={{ paddingLeft: 14, borderLeft: '1px solid #334' }}>
+              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)', boxShadow: `0 0 0 1.5px ${C.gold}` }}>
                 <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{initials(admin?.fullName || '')}</span>
               </div>
               <div>
@@ -1012,95 +1083,211 @@ export default function BlicPayAdmin() {
                 </p>
               </div>
             </div>
-            <button className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              <Bell size={15} color="#fff" />
-            </button>
             <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label="Dekonekte">
               <LogOut size={15} color="#fff" />
             </button>
           </div>
         </div>
-        <div className="flex items-center flex-wrap" style={{ padding: '0 20px 10px', gap: 2 }}>
+        <div className="flex items-center flex-wrap" style={{ padding: '0 20px', gap: 2 }}>
           {NAV_ITEMS.map((item) => (
             <button key={item.id} onClick={() => goTo(item)}
-              className="nav-item flex items-center gap-2 text-sm"
+              className="nav-item flex items-center gap-1.5 text-sm rounded-t"
               style={{
-                padding: '8px 12px',
+                padding: '9px 12px',
                 fontWeight: nav === item.id ? 700 : 500,
                 color: nav === item.id ? '#fff' : 'rgba(255,255,255,0.55)',
+                background: nav === item.id ? 'rgba(15,45,82,0.5)' : 'transparent',
                 borderBottom: nav === item.id ? `2px solid ${C.gold}` : '2px solid transparent',
               }}>
+
               <item.icon size={15} />
               <span>{item.label}</span>
-              {item.count > 0 && <Badge tone="danger">{item.count}</Badge>}
+              {item.count > 0 && (
+                <span className="text-[10px] font-bold rounded-full" style={{
+                  padding: '1px 6px',
+                  background: item.id === 'kyc' ? 'rgba(181,72,46,0.35)' : item.id === 'pending' ? 'rgba(28,111,191,0.35)' : nav === item.id ? C.gold : 'rgba(255,255,255,0.18)',
+                  color: item.id === 'kyc' ? '#f3c9bd' : item.id === 'pending' ? '#bcdcff' : nav === item.id ? '#fff' : '#fff',
+                }}>
+                  {item.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </div>
 
+      {notifPanelOpen && (
+        <>
+          <div onClick={() => setNotifPanelOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
+          <div className="fadein rounded-lg overflow-hidden" style={{
+            position: 'fixed', top: 66, right: 24, width: 360, maxHeight: 420, zIndex: 40,
+            background: C.card, border: `1px solid ${C.border}`, boxShadow: '0px 12px 32px -4px rgba(10,33,64,0.22)',
+            display: 'flex', flexDirection: 'column',
+          }}>
+            <div className="flex items-center justify-between" style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
+              <p className="text-sm font-bold" style={{ color: C.ink }}>Notifikasyon</p>
+              {unreadCount > 0 && (
+                <button onClick={markAllNotificationsRead} className="text-xs font-semibold" style={{ color: C.navy }}>
+                  Make tout li
+                </button>
+              )}
+            </div>
+            <div style={{ overflowY: 'auto' }}>
+              {notifications.length === 0 ? (
+                <p className="text-sm text-center" style={{ color: C.muted, padding: '32px 16px' }}>Pa gen notifikasyon toujou.</p>
+              ) : notifications.map((n, i) => (
+                <button key={n.id} onClick={() => !n.read && markNotificationRead(n.id)}
+                  className="bp-btn w-full text-left" style={{
+                    padding: '11px 16px', borderTop: i ? `1px solid ${C.border}` : 'none',
+                    background: n.read ? C.card : '#FFFDF9',
+                  }}>
+                  <div className="flex items-start gap-2">
+                    {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.gold, marginTop: 5, flexShrink: 0 }} />}
+                    <div style={{ flex: 1 }}>
+                      <p className="text-xs font-bold" style={{ color: C.ink }}>{n.title}</p>
+                      <p className="text-xs mt-0.5" style={{ color: C.muted }}>{n.body}</p>
+                      <p className="text-[10px] mt-1" style={{ color: C.muted }}>{new Date(n.createdAt).toLocaleString('fr-FR')}</p>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
       {/* kontni — pran tout lajè a kounye a */}
       <div style={{ padding: '32px 40px', maxWidth: 1440, width: '100%', margin: '0 auto' }}>
-          {nav === 'overview' && (
+          {nav === 'overview' && (() => {
+            const totalDeposit = financeData?.totalDepositVolume ?? 0;
+            const totalWithdrawal = financeData?.totalWithdrawalVolume ?? 0;
+            const solFundTotal = (financeData?.solGroups || []).reduce((s, g) => s + g.potential, 0);
+            const loanOutstanding = financeData?.digitalProducts?.loans?.totalOutstanding ?? 0;
+            const moncashReserve = reserves.find((r) => r.method === 'moncash')?.balance || 0;
+            const natcashReserve = reserves.find((r) => r.method === 'natcash')?.balance || 0;
+            const totalReserve = moncashReserve + natcashReserve;
+            const totalBalance = totalDeposit + totalGoalsSaved + totalTransferVolume;
+            return (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Apèsi</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Rezime aktivite BLICPay jodi a.</p>
-
-              <div className="mt-6 p-6 rounded-2xl relative overflow-hidden" style={{ background: C.navy }}>
-                <p className="text-xs font-semibold" style={{ color: 'rgba(255,255,255,0.8)' }}>TOTAL TOUT ANTRE YO</p>
-                <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 6 }}>
-                  <p style={{ ...fontDisplay, fontSize: 34, fontWeight: 800, color: '#fff' }}>
-                    {money(totalPendingAmount + totalGoalsSaved + totalTransferVolume)}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink }}>
+                    Bonjou, {admin?.fullName}
+                  </h1>
+                  <p className="text-xs mt-1" style={{ color: C.muted }}>
+                    📅 {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
-                  {exchangeRate && (
-                    <span style={{ ...fontMono, fontSize: 14, color: C.gold, fontWeight: 700 }}>
-                      ≈ ${((totalPendingAmount + totalGoalsSaved + totalTransferVolume) / exchangeRate.rate).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD
-                    </span>
-                  )}
                 </div>
-                <p className="text-xs mt-1" style={{ color: 'rgba(255,255,255,0.75)' }}>
-                  Depo + lajan nan Objektif + volim Transfè
-                  {exchangeRate && ` · Tal BRH: 1 USD = ${exchangeRate.rate} HTG (${exchangeRate.rateDate})`}
-                </p>
               </div>
 
-              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatCard label="Depo annatant" value={pending.length} sub={money(totalPendingAmount)} accent={C.amber} />
-                <StatCard label="Retrait annatant" value={withdrawals.length} sub={money(totalWithdrawAmount)} accent={C.danger} />
-                <StatCard label="Demand Sòl" value={solRequests.length} sub="ap tann apwobasyon" accent={C.navy} />
-                <StatCard label="Verifikasyon KYC" value={kycSubmissions.length} sub="ap tann egzamen" accent={C.purple} />
-              </div>
+              {/* Kat balans prensipal — done reyèl sèlman */}
+              <div className="rounded-2xl p-6 text-white relative overflow-hidden" style={{ marginTop: 18, background: `linear-gradient(120deg, ${C.navyDeep}, ${C.navy} 60%, #133863)`, border: `1px solid ${C.navy}` }}>
+                <div style={{ position: 'absolute', right: -60, top: -60, width: 280, height: 280, borderRadius: '50%', background: 'rgba(185,134,47,0.10)', filter: 'blur(50px)', pointerEvents: 'none' }} />
+                <div className="relative">
+                  <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>Balans Total Tout Pwodwi BLICPay</p>
+                  <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 6 }}>
+                    <span style={{ ...fontMono, fontSize: 34, fontWeight: 800, color: '#fff' }}>{money(totalBalance)}</span>
+                    {exchangeRate && (
+                      <span style={{ ...fontMono, fontSize: 16, color: C.gold, fontWeight: 700 }}>
+                        ≈ ${(totalBalance / exchangeRate.rate).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD
+                      </span>
+                    )}
+                  </div>
+                  {exchangeRate && (
+                    <p className="text-[10px] mt-1" style={{ ...fontMono, color: 'rgba(255,255,255,0.5)' }}>Tal BRH: 1 USD = {exchangeRate.rate} HTG ({exchangeRate.rateDate})</p>
+                  )}
 
-              <div className="mt-8 flex items-center justify-between">
-                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>DEPO K'AP TANN</h3>
-                <button onClick={() => setNav('pending')} className="text-xs font-semibold flex items-center gap-1" style={{ color: C.navy }}>
-                  Wè tout <ChevronRight size={13} />
-                </button>
-              </div>
-              <div className="mt-3 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
-                {pending.slice(0, 3).map((d, i) => {
-                  const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
-                  return (
-                    <div key={d.id} className="flex items-center justify-between px-4 py-3.5"
-                      style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
-                          {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={15} color="#fff" />}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium">{d.user}</p>
-                          <p className="text-xs mt-0.5" style={{ color: C.muted }}>{M.label} · {d.date}</p>
-                        </div>
-                      </div>
-                      <span style={fontMono} className="text-sm">{money(d.amount)}</span>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs" style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+                    <div>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Volim Depo (tout tan)</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(totalDeposit)}</p>
                     </div>
-                  );
-                })}
-                {pending.length === 0 && (
-                  <p className="text-sm p-5" style={{ color: C.muted, background: C.card }}>Pa gen depo k'ap tann.</p>
+                    <div>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Fon BLIC Sòl Potansyèl</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(solFundTotal)}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Pòtfèy Prè Ankou</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(loanOutstanding)}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Rezèv MonCash+NatCash</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: C.gold, marginTop: 3 }}>{money(totalReserve)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 kat KPI operasyonèl, style Stitch */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginTop: 18 }}>
+                {[
+                  { label: 'Depo Ap Tann Validasyon', value: `${pending.length} demann`, sub: money(totalPendingAmount), tone: '#8A6423', bg: '#FBF0DE', tab: 'pending' },
+                  { label: 'Demann Retrè Ap Tann', value: `${withdrawals.length} demann`, sub: money(totalWithdrawAmount), tone: C.danger, bg: '#FBEBE6', tab: 'withdrawals' },
+                  { label: 'Aderans BLIC Sòl', value: `${solRequests.length} demann`, sub: 'ap tann apwobasyon', tone: C.purple, bg: '#F4EBFF', tab: 'sol' },
+                  { label: 'Dosye KYC Pou Tcheke', value: `${kycSubmissions.length} dosye`, sub: 'ap tann egzamen', tone: C.navy, bg: '#E6F0FB', tab: 'kyc' },
+                ].map((c) => (
+                  <button key={c.label} onClick={() => setNav(c.tab)} className="bp-btn text-left bg-white rounded-xl" style={{ padding: 16, border: `1px solid ${C.border}` }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{c.label}</span>
+                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: c.bg }}>
+                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: c.tone, display: 'inline-block' }} />
+                      </div>
+                    </div>
+                    <p style={{ ...fontMono, fontSize: 19, fontWeight: 800, color: C.ink, marginTop: 8 }}>{c.value}</p>
+                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>{c.sub}</p>
+                  </button>
+                ))}
+              </div>
+
+              {/* Depo resan — done reyèl */}
+              <div className="bg-white rounded-2xl overflow-hidden" style={{ marginTop: 20, border: `1px solid ${C.border}` }}>
+                <div className="flex items-center justify-between" style={{ padding: 16, borderBottom: `1px solid ${C.border}` }}>
+                  <div>
+                    <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: C.ink }}>Dènye Depo Ap Tann</h2>
+                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>Tout metòd — MonCash, NatCash, biwo</p>
+                  </div>
+                  <button onClick={() => setNav('pending')} className="text-xs font-semibold flex items-center gap-1" style={{ color: C.navy }}>
+                    Wè tout <ChevronRight size={13} />
+                  </button>
+                </div>
+                {pending.length === 0 ? (
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Pa gen depo k'ap tann.</p>
+                ) : (
+                  <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: C.bg }}>
+                        <Th>Kliyan</Th><Th>Referans</Th><Th align="right">Montan</Th><Th align="center">Estati</Th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-xs">
+                      {pending.slice(0, 5).map((d) => {
+                        const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
+                        return (
+                          <tr key={d.id} style={{ borderTop: `1px solid ${C.border}` }}>
+                            <Td>
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
+                                  {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={13} color="#fff" />}
+                                </div>
+                                <div>
+                                  <p className="font-bold" style={{ color: C.ink }}>{d.user}</p>
+                                  <p style={{ ...fontMono, fontSize: 10.5, color: C.muted }}>{d.phone}</p>
+                                </div>
+                              </div>
+                            </Td>
+                            <Td><span style={{ ...fontMono, fontSize: 11 }}>{d.reference}</span></Td>
+                            <Td align="right"><span style={{ ...fontMono, fontWeight: 700 }}>+{money(d.amount)}</span></Td>
+                            <Td align="center"><Badge tone="amber">Ap tann</Badge></Td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {nav === 'pending' && (
             <div className="fadein">
