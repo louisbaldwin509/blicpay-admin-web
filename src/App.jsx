@@ -6,13 +6,44 @@ import {
   PiggyBank, HandCoins, FileText, User, Phone, Lock, KeyRound, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
 } from 'lucide-react';
 
+import { ADMIN_DICT } from './i18n/adminDict.js';
+
 const API_BASE_URL = 'https://api.blicpayht.com';
+
+// Lang panèl la (ht | fr | en) — mete ajou nan chak rann BlicPayAdmin.
+// tt("tèks kreyòl", ...valè) → tradiksyon fr/en (oswa kreyòl la si pa jwenn).
+let CURRENT_LANG = (() => { try { const v = localStorage.getItem('blicpay_admin_lang'); return ['ht', 'fr', 'en'].includes(v) ? v : 'ht'; } catch { return 'ht'; } })();
+const LANG_IDX = { fr: 0, en: 1 };
+function tt(s, ...args) {
+  let out = typeof s === 'string' && s.includes('@@') ? s.split('@@')[0] : s;
+  if (CURRENT_LANG !== 'ht' && typeof s === 'string') {
+    const row = ADMIN_DICT[s];
+    if (row && row[LANG_IDX[CURRENT_LANG]]) out = row[LANG_IDX[CURRENT_LANG]];
+  }
+  if (args.length) out = String(out).replace(/\{(\d+)\}/g, (m, i) => (args[i] ?? m));
+  return out;
+}
+
+// Ti seleksyon lang (HT / FR / EN).
+function LangSwitch({ lang, setLang, dark }) {
+  return (
+    <div className="flex items-center rounded-full p-0.5" style={{ background: dark ? 'rgba(255,255,255,0.1)' : '#EEF1F6' }}>
+      {['ht', 'fr', 'en'].map((l) => (
+        <button key={l} onClick={() => setLang(l)} className="px-2 py-1 rounded-full text-[11px] font-bold uppercase"
+          style={lang === l ? { background: dark ? '#fff' : '#0A2140', color: dark ? '#0A2140' : '#fff' } : { color: dark ? 'rgba(255,255,255,0.7)' : '#5B6B80' }}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 async function apiFetch(path, { method = 'GET', body, token } = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
+      'X-BLIC-Lang': CURRENT_LANG,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
@@ -56,7 +87,7 @@ function addMonthsToDate(dateStr, n) {
   if (!dateStr) return null;
   const d = new Date(dateStr);
   d.setMonth(d.getMonth() + n);
-  return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 const DEMO_TOKEN = 'demo-token';
@@ -148,7 +179,7 @@ const BIZ_STATUS = {
   draft: { label: 'Pou ranpli', tone: 'muted' },
   submitted: { label: 'Ap tann egzamen', tone: 'amber' },
   needs_info: { label: 'Enfòmasyon mande', tone: 'premium' },
-  approved: { label: 'Apwouve', tone: 'mint' },
+  approved: { label: 'Apwouve@@biz', tone: 'mint' },
   rejected: { label: 'Refize', tone: 'danger' },
 };
 const BIZ_FILTERS = [
@@ -177,7 +208,7 @@ function BusinessReview({ token }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
 
-  const T = (l) => (l ? l.ht || l.fr : '');
+  const T = (l) => (l ? l[CURRENT_LANG] || l.ht || l.fr : '');
   const docLabel = (k) => T(types?.documents?.[k]) || k;
   const formLabel = (k) => T(types?.legalForms?.[k]?.label) || k;
 
@@ -224,7 +255,7 @@ function BusinessReview({ token }) {
   async function setDocStatus(d, status) {
     let docNote = null;
     if (status === 'rejected') {
-      docNote = window.prompt('Poukisa dokiman sa a refize? (kliyan an ap wè mesaj sa a)');
+      docNote = window.prompt(tt("Poukisa dokiman sa a refize? (kliyan an ap wè mesaj sa a)"));
       if (!docNote) return;
     }
     try {
@@ -237,7 +268,7 @@ function BusinessReview({ token }) {
 
   async function decide(action) {
     if ((action === 'reject' || action === 'request-info') && !note.trim()) {
-      setMsg({ error: true, text: action === 'reject' ? 'Ekri rezon refi a anvan.' : 'Ekri sa kliyan an dwe voye anvan.' });
+      setMsg({ error: true, text: action === 'reject' ? tt("Ekri rezon refi a anvan.") : tt("Ekri sa kliyan an dwe voye anvan.") });
       return;
     }
     setBusy(true);
@@ -245,7 +276,7 @@ function BusinessReview({ token }) {
     try {
       const body = action === 'reject' ? { reason: note } : action === 'request-info' ? { note } : {};
       await apiFetch(`/admin/businesses/${selected.id}/${action}`, { method: 'POST', token, body });
-      setMsg({ text: action === 'approve' ? 'Kont antrepriz la apwouve. Kliyan an resevwa yon notifikasyon.' : action === 'reject' ? 'Dosye a refize. Kliyan an resevwa rezon an.' : 'Demand enfòmasyon an voye bay kliyan an.' });
+      setMsg({ text: action === 'approve' ? tt("Kont antrepriz la apwouve. Kliyan an resevwa yon notifikasyon.") : action === 'reject' ? tt("Dosye a refize. Kliyan an resevwa rezon an.") : tt("Demand enfòmasyon an voye bay kliyan an.") });
       await open(selected);
       loadList();
     } catch (e) {
@@ -264,22 +295,22 @@ function BusinessReview({ token }) {
   if (!selected) {
     return (
       <div className="fadein">
-        <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Kont Antrepriz</h1>
-        <p className="text-sm mt-1" style={{ color: C.muted }}>Egzamine dosye legal antrepriz yo anvan ou aktive kont lan (plafon antrepriz, resepsyon peman, non komèsyal).</p>
+        <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Kont Antrepriz")}</h1>
+        <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Egzamine dosye legal antrepriz yo anvan ou aktive kont lan (plafon antrepriz, resepsyon peman, non komèsyal).")}</p>
         <div className="mt-4 flex flex-wrap gap-2">
           {BIZ_FILTERS.map((f) => (
             <button key={f.id} onClick={() => setFilter(f.id)} className="bp-btn px-3 py-1.5 rounded-full text-xs font-semibold"
               style={{ background: filter === f.id ? C.navy : C.card, color: filter === f.id ? '#fff' : C.ink, border: `1px solid ${filter === f.id ? C.navy : C.border}` }}>
-              {f.label}
+              {tt(f.label === 'Apwouve' ? 'Apwouve@@biz' : f.label)}
             </button>
           ))}
         </div>
         <Msg />
         <div className="mt-5 flex flex-col gap-3">
           {loading ? (
-            <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+            <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
           ) : list.length === 0 ? (
-            <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen dosye nan kategori sa a.</p>
+            <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>{tt("Pa gen dosye nan kategori sa a.")}</p>
           ) : list.map((b) => (
             <button key={b.id} onClick={() => open(b)} className="bp-btn text-left p-4 rounded-xl flex items-center justify-between gap-3"
               style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -290,14 +321,14 @@ function BusinessReview({ token }) {
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate">{b.tradeName ? `${b.tradeName} — ` : ''}{b.legalName}</p>
                   <p className="text-xs mt-0.5" style={{ color: C.muted }}>
-                    {formLabel(b.legalForm)} · {b.user.fullName} · {b.user.clientId} · {b._count.documents} dokiman
-                    {b.submittedAt ? ` · soumèt ${new Date(b.submittedAt).toLocaleDateString('fr-FR')}` : ''}
+                    {formLabel(b.legalForm)} · {b.user.fullName} · {b.user.clientId} · {b._count.documents} {tt("dokiman")}
+                    {b.submittedAt ? tt(" · soumèt {0}", new Date(b.submittedAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')) : ''}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {!b.user.verified && <Badge tone="danger">KYC pa fèt</Badge>}
-                <Badge tone={BIZ_STATUS[b.status]?.tone}>{BIZ_STATUS[b.status]?.label}</Badge>
+                {!b.user.verified && <Badge tone="danger">{tt("KYC pa fèt")}</Badge>}
+                <Badge tone={BIZ_STATUS[b.status]?.tone}>{tt(BIZ_STATUS[b.status]?.label)}</Badge>
                 <ChevronRight size={16} color={C.muted} />
               </div>
             </button>
@@ -315,10 +346,10 @@ function BusinessReview({ token }) {
   return (
     <div className="fadein">
       <button onClick={() => { setSelected(null); setDetail(null); setMsg(null); }} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: C.muted }}>
-        <ChevronLeft size={15} /> Retounen nan lis la
+        <ChevronLeft size={15} /> {tt("Retounen nan lis la")}
       </button>
       {!b ? (
-        <p className="text-sm" style={{ color: C.muted }}>Ap chaje dosye a...</p>
+        <p className="text-sm" style={{ color: C.muted }}>{tt("Ap chaje dosye a...")}</p>
       ) : (
         <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
           <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -327,35 +358,35 @@ function BusinessReview({ token }) {
                 <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20 }}>{b.legalName}</p>
                 <p className="text-xs mt-1" style={{ color: C.muted }}>{formLabel(b.legalForm)}</p>
               </div>
-              <Badge tone={BIZ_STATUS[b.status]?.tone}>{BIZ_STATUS[b.status]?.label}</Badge>
+              <Badge tone={BIZ_STATUS[b.status]?.tone}>{tt(BIZ_STATUS[b.status]?.label)}</Badge>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
               {BIZ_FIELDS.map(([k, label]) => (
                 <div key={k}>
-                  <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{label}</p>
+                  <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt(label)}</p>
                   <p className="text-sm" style={{ color: b[k] ? C.ink : C.muted }}>{b[k] || '—'}</p>
                 </div>
               ))}
               <div>
-                <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>Chif dafè</p>
+                <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt("Chif dafè")}</p>
                 <p className="text-sm">{T(types?.turnoverRanges?.[b.turnoverRange]) || '—'}</p>
               </div>
             </div>
             <div className="p-3 rounded-lg" style={{ background: C.bg }}>
-              <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>Reprezantan legal</p>
+              <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt("Reprezantan legal")}</p>
               <div className="flex items-center justify-between mt-1 gap-2">
                 <div>
                   <p className="text-sm font-semibold">{b.user.fullName}</p>
                   <p className="text-xs" style={{ color: C.muted }}>{b.user.phone} · {b.user.clientId}</p>
                 </div>
-                {b.user.verified ? <Badge tone="mint">KYC verifye</Badge> : <Badge tone="danger">KYC pa verifye</Badge>}
+                {b.user.verified ? <Badge tone="mint">{tt("KYC verifye")}</Badge> : <Badge tone="danger">{tt("KYC pa verifye")}</Badge>}
               </div>
             </div>
-            {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>Dènye nòt: {b.adminNote}</p>}
+            {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>{tt("Dènye nòt:")} {b.adminNote}</p>}
           </div>
 
           <div className="p-5 rounded-2xl flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-            <p className="font-bold">Dokiman legal</p>
+            <p className="font-bold">{tt("Dokiman legal")}</p>
             {[...reqs.required.map((k) => [k, true]), ...reqs.optional.map((k) => [k, false])].map(([k, req]) => {
               const d = docFor(k);
               return (
@@ -363,26 +394,26 @@ function BusinessReview({ token }) {
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{docLabel(k)}</p>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {!d ? <Badge tone={req ? 'danger' : 'muted'}>{req ? 'Manke' : 'Opsyonèl'}</Badge>
-                        : d.status === 'accepted' ? <Badge tone="mint">Aksepte</Badge>
-                        : d.status === 'rejected' ? <Badge tone="danger">Refize</Badge>
-                        : <Badge tone="amber">Pou egzamine</Badge>}
-                      {d && <span className="text-xs" style={{ color: C.muted }}>{d.mimeType === 'application/pdf' ? 'PDF' : 'Foto'} · {new Date(d.uploadedAt).toLocaleDateString('fr-FR')}</span>}
+                      {!d ? <Badge tone={req ? 'danger' : 'muted'}>{req ? tt("Manke") : tt("Opsyonèl")}</Badge>
+                        : d.status === 'accepted' ? <Badge tone="mint">{tt("Aksepte")}</Badge>
+                        : d.status === 'rejected' ? <Badge tone="danger">{tt("Refize")}</Badge>
+                        : <Badge tone="amber">{tt("Pou egzamine")}</Badge>}
+                      {d && <span className="text-xs" style={{ color: C.muted }}>{d.mimeType === 'application/pdf' ? tt("PDF") : tt("Foto")} · {new Date(d.uploadedAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')}</span>}
                     </div>
                     {d?.note && <p className="text-xs mt-1" style={{ color: C.danger }}>{d.note}</p>}
                   </div>
                   {d && (
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button onClick={() => viewDoc(d)} className="bp-btn px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}` }}>
-                        <Eye size={12} /> Wè
+                        <Eye size={12} /> {tt("Wè")}
                       </button>
                       {d.status !== 'accepted' && (
-                        <button onClick={() => setDocStatus(d, 'accepted')} title="Aksepte" className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'rgba(61,122,92,0.12)' }}>
+                        <button onClick={() => setDocStatus(d, 'accepted')} title={tt("Aksepte@@btn")} className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'rgba(61,122,92,0.12)' }}>
                           <Check size={14} color={C.mint} />
                         </button>
                       )}
                       {d.status !== 'rejected' && (
-                        <button onClick={() => setDocStatus(d, 'rejected')} title="Refize" className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'rgba(181,72,46,0.10)' }}>
+                        <button onClick={() => setDocStatus(d, 'rejected')} title={tt("Refize@@btn")} className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'rgba(181,72,46,0.10)' }}>
                           <X size={14} color={C.danger} />
                         </button>
                       )}
@@ -393,26 +424,26 @@ function BusinessReview({ token }) {
             })}
 
             <div className="mt-2 pt-4 flex flex-col gap-2" style={{ borderTop: `1px solid ${C.border}` }}>
-              <p className="font-bold">Desizyon</p>
+              <p className="font-bold">{tt("Desizyon")}</p>
               {detail.missing?.length > 0 && (
                 <p className="text-xs p-2.5 rounded-lg" style={{ background: 'rgba(181,72,46,0.08)', color: C.danger }}>
-                  Dosye a pa konplè: {detail.missing.map((m) => (m.startsWith('doc:') ? docLabel(m.slice(4)) : m.slice(6))).join(', ')}
+                  {tt("Dosye a pa konplè:")} {detail.missing.map((m) => (m.startsWith('doc:') ? docLabel(m.slice(4)) : m.slice(6))).join(', ')}
                 </p>
               )}
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Rezon refi a oswa sa kliyan an dwe voye (obligatwa pou refize / mande enfòmasyon)"
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={tt("Rezon refi a oswa sa kliyan an dwe voye (obligatwa pou refize / mande enfòmasyon)")}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ border: `1px solid ${C.border}`, background: C.bg, resize: 'vertical' }} />
               <div className="flex flex-wrap gap-2">
                 <button disabled={busy} onClick={() => decide('approve')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ background: C.mint, opacity: busy ? 0.6 : 1 }}>
-                  <BadgeCheck size={15} /> Apwouve kont antrepriz la
+                  <BadgeCheck size={15} /> {tt("Apwouve kont antrepriz la")}
                 </button>
                 <button disabled={busy} onClick={() => decide('request-info')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}`, opacity: busy ? 0.6 : 1 }}>
-                  <FileText size={15} /> Mande plis enfòmasyon
+                  <FileText size={15} /> {tt("Mande plis enfòmasyon")}
                 </button>
                 <button disabled={busy} onClick={() => decide('reject')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5" style={{ background: 'rgba(181,72,46,0.10)', color: C.danger, opacity: busy ? 0.6 : 1 }}>
-                  <X size={15} /> Refize
+                  <X size={15} /> {tt("Refize@@btn")}
                 </button>
               </div>
-              {!b.user.verified && <p className="text-xs" style={{ color: C.danger }}>Atansyon: reprezantan legal la poko verifye idantite l (KYC).</p>}
+              {!b.user.verified && <p className="text-xs" style={{ color: C.danger }}>{tt("Atansyon: reprezantan legal la poko verifye idantite l (KYC).")}</p>}
               <Msg />
             </div>
           </div>
@@ -428,10 +459,10 @@ function BusinessReview({ token }) {
               <button onClick={() => setViewer(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }}><X size={14} color={C.muted} /></button>
             </div>
             <div className="flex-1 overflow-auto p-3 flex items-center justify-center" style={{ background: C.bg }}>
-              {viewer.loading ? <p className="text-sm" style={{ color: C.muted }}>Ap chaje dokiman an...</p>
+              {viewer.loading ? <p className="text-sm" style={{ color: C.muted }}>{tt("Ap chaje dokiman an...")}</p>
                 : viewer.doc.mimeType === 'application/pdf'
                   ? <iframe title="dokiman" src={`data:application/pdf;base64,${viewer.doc.fileData}`} style={{ width: '100%', height: '100%', border: 0, background: '#fff' }} />
-                  : <img src={`data:${viewer.doc.mimeType};base64,${viewer.doc.fileData}`} alt="Dokiman" className="max-w-full max-h-full rounded-lg object-contain" />}
+                  : <img src={`data:${viewer.doc.mimeType};base64,${viewer.doc.fileData}`} alt={tt("Dokiman")} className="max-w-full max-h-full rounded-lg object-contain" />}
             </div>
           </div>
         </>
@@ -441,6 +472,9 @@ function BusinessReview({ token }) {
 }
 
 export default function BlicPayAdmin() {
+  const [lang, setLangState] = useState(CURRENT_LANG);
+  const setLang = (l) => { setLangState(l); try { localStorage.setItem('blicpay_admin_lang', l); } catch { /* pa enpòtan */ } };
+  CURRENT_LANG = lang;
   const [token, setToken] = useState(null);
   const [admin, setAdmin] = useState(null);
   const [loginForm, setLoginForm] = useState({ phone: '', password: '' });
@@ -677,7 +711,7 @@ export default function BlicPayAdmin() {
 
   async function saveReserve(method) {
     const numeric = Number(reserveInput);
-    if (!Number.isFinite(numeric) || numeric < 0) { flash('Balans lan pa valab.'); return; }
+    if (!Number.isFinite(numeric) || numeric < 0) { flash(tt("Balans lan pa valab.")); return; }
     setSavingReserve(true);
     try {
       const { reserve } = await apiFetch(`/admin/reserves/${method}`, { method: 'PATCH', token, body: { balance: numeric } });
@@ -686,7 +720,7 @@ export default function BlicPayAdmin() {
         return [...others, reserve].sort((a, b) => a.method.localeCompare(b.method));
       });
       setEditingReserveMethod(null);
-      flash('Rezèv la mete ajou.');
+      flash(tt("Rezèv la mete ajou."));
     } catch (err) { flash(err.message); } finally { setSavingReserve(false); }
   }
 
@@ -780,23 +814,23 @@ export default function BlicPayAdmin() {
     try {
       const { verification } = await apiFetch(`/admin/kyc/didit/${selectedKyc.id}/refresh`, { method: 'POST', token });
       setKycDetail(verification);
-      flash('Rapò a mete ajou dirèkteman soti nan Didit.');
+      flash(tt("Rapò a mete ajou dirèkteman soti nan Didit."));
     } catch (err) { flash(err.message); } finally { setKycRefreshing(false); }
   }
 
   async function decideKyc(decision) {
     if (!selectedKyc) return;
     if (decision === 'reject' && !kycRejectReason.trim()) {
-      flash('Yon rezon obligatwa pou refize.');
+      flash(tt("Yon rezon obligatwa pou refize."));
       return;
     }
     try {
       if (decision === 'approve') {
         await apiFetch(`/admin/kyc/didit/${selectedKyc.id}/approve`, { method: 'POST', token, body: {} });
-        flash('Kliyan an verifye.');
+        flash(tt("Kliyan an verifye."));
       } else {
         await apiFetch(`/admin/kyc/didit/${selectedKyc.id}/reject`, { method: 'POST', token, body: { reason: kycRejectReason.trim() } });
-        flash('Demand lan refize.');
+        flash(tt("Demand lan refize."));
       }
       setSelectedKyc(null);
       setKycDetail(null);
@@ -805,10 +839,10 @@ export default function BlicPayAdmin() {
   }
 
   const VR_TYPE_LABELS = {
-    address_proof: 'Prèv adrès',
-    income_proof: 'Prèv revni',
-    identity_reverify: 'Refè verifikasyon idantite',
-    other: 'Lòt dokiman',
+    address_proof: tt("Prèv adrès"),
+    income_proof: tt("Prèv revni"),
+    identity_reverify: tt("Refè verifikasyon idantite"),
+    other: tt("Lòt dokiman"),
   };
 
   async function loadVerificationRequests(authToken = token) {
@@ -822,16 +856,16 @@ export default function BlicPayAdmin() {
   async function decideVerificationRequest(decision) {
     if (!selectedVr) return;
     if (decision === 'reject' && !vrRejectReason.trim()) {
-      flash('Yon rezon obligatwa pou refize.');
+      flash(tt("Yon rezon obligatwa pou refize."));
       return;
     }
     try {
       if (decision === 'approve') {
         await apiFetch(`/admin/verification-requests/${selectedVr.id}/approve`, { method: 'POST', token, body: {} });
-        flash('Dokiman an apwouve.');
+        flash(tt("Dokiman an apwouve."));
       } else {
         await apiFetch(`/admin/verification-requests/${selectedVr.id}/reject`, { method: 'POST', token, body: { reason: vrRejectReason.trim() } });
-        flash('Demand lan refize.');
+        flash(tt("Demand lan refize."));
       }
       setSelectedVr(null);
       setVrRejectReason('');
@@ -855,14 +889,14 @@ export default function BlicPayAdmin() {
       await apiFetch(`/admin/users/${selectedUser.id}/verification-requests`, {
         method: 'POST', token, body: { type: newVrType, note: newVrNote.trim() || undefined },
       });
-      flash('Demand voye bay kliyan an.');
+      flash(tt("Demand voye bay kliyan an."));
       setNewVrNote('');
       loadUserVerificationRequests(selectedUser.id);
     } catch (err) { flash(err.message); } finally { setCreatingVr(false); }
   }
 
   const SUPPORT_SUBJECT_LABELS = {
-    kont: 'Kont', depo: 'Depo', sol: 'BLIC Sòl', pre: 'Prè', lot: 'Lòt',
+    kont: tt("Kont"), depo: tt("Depo"), sol: tt("BLIC Sòl"), pre: tt("Prè"), lot: tt("Lòt"),
   };
 
   async function loadSupportMessages(authToken = token) {
@@ -877,7 +911,7 @@ export default function BlicPayAdmin() {
     try {
       await apiFetch(`/admin/support/${id}/close`, { method: 'POST', token, body: {} });
       setSupportMessages((ms) => ms.filter((m) => m.id !== id));
-      flash('Mesaj la make rezoud.');
+      flash(tt("Mesaj la make rezoud."));
     } catch (err) { flash(err.message); }
   }
 
@@ -918,25 +952,25 @@ export default function BlicPayAdmin() {
     try {
       await apiFetch(`/admin/users/${a.id}/block`, { method: 'PATCH', token, body: { blocked: !a.blocked } });
       setAgents((ags) => ags.map((x) => x.id === a.id ? { ...x, blocked: !a.blocked } : x));
-      flash(!a.blocked ? 'Ajan bloke.' : 'Ajan debloke.');
+      flash(!a.blocked ? tt("Ajan bloke.") : tt("Ajan debloke."));
     } catch (err) { flash(err.message); }
   }
 
   async function deleteAgent(a) {
-    if (!window.confirm(`Efase kont ajan ${a.fullName} nèt? Aksyon sa a pa ka anile.`)) return;
+    if (!window.confirm(tt("Efase kont ajan {0} nèt? Aksyon sa a pa ka anile.", a.fullName))) return;
     try {
       await apiFetch(`/admin/agents/${a.id}`, { method: 'DELETE', token });
       setAgents((ags) => ags.filter((x) => x.id !== a.id));
-      flash('Ajan efase.');
+      flash(tt("Ajan efase."));
     } catch (err) { flash(err.message); }
   }
 
   async function deleteBranch(b) {
-    if (!window.confirm(`Efase siikisal "${b.name}" nèt? Aksyon sa a pa ka anile.`)) return;
+    if (!window.confirm(tt("Efase siikisal \"{0}\" nèt? Aksyon sa a pa ka anile.", b.name))) return;
     try {
       await apiFetch(`/admin/branches/${b.id}`, { method: 'DELETE', token });
       setBranches((brs) => brs.filter((x) => x.id !== b.id));
-      flash('Siikisal la efase.');
+      flash(tt("Siikisal la efase."));
     } catch (err) { flash(err.message); }
   }
 
@@ -951,17 +985,17 @@ export default function BlicPayAdmin() {
 
   async function createBranch() {
     if (!branchForm.name.trim()) {
-      flash('Antre non siikisal la.');
+      flash(tt("Antre non siikisal la."));
       return;
     }
     setCreatingBranch(true);
     try {
       if (editingBranchId) {
         await apiFetch(`/admin/branches/${editingBranchId}`, { method: 'PATCH', token, body: branchForm });
-        flash('Siikisal la mete ajou.');
+        flash(tt("Siikisal la mete ajou."));
       } else {
         await apiFetch('/admin/branches', { method: 'POST', token, body: branchForm });
-        flash('Siikisal la kreye.');
+        flash(tt("Siikisal la kreye."));
       }
       setBranchForm({ name: '', address: '', phone: '', managerName: '', openingHours: '' });
       setEditingBranchId(null);
@@ -985,7 +1019,7 @@ export default function BlicPayAdmin() {
 
   async function createAgent() {
     if (!agentForm.fullName.trim() || !agentForm.phone.trim() || (!editingAgentId && !agentForm.password) || !agentForm.branch.trim()) {
-      flash('Ranpli tout chan obligatwa yo.');
+      flash(tt("Ranpli tout chan obligatwa yo."));
       return;
     }
     setCreatingAgent(true);
@@ -998,7 +1032,7 @@ export default function BlicPayAdmin() {
       }
       if (editingAgentId) {
         await apiFetch(`/admin/agents/${editingAgentId}`, { method: 'PATCH', token, body: { ...agentForm, photoImage, photoMimeType } });
-        flash('Ajan an mete ajou.');
+        flash(tt("Ajan an mete ajou."));
         setAgents((ags) => ags.map((x) => x.id !== editingAgentId ? x : {
           ...x, fullName: agentForm.fullName.trim(), phone: agentForm.phone.trim(), branch: agentForm.branch.trim(),
           email: agentForm.email?.trim() || null, idNumber: agentForm.idNumber?.trim() || null,
@@ -1006,7 +1040,7 @@ export default function BlicPayAdmin() {
         }));
       } else {
         await apiFetch('/admin/agents', { method: 'POST', token, body: { ...agentForm, photoImage, photoMimeType } });
-        flash('Kont ajan an kreye.');
+        flash(tt("Kont ajan an kreye."));
       }
       setAgentForm({ fullName: '', phone: '', password: '', branch: '', email: '', idNumber: '', hireDate: '' });
       setAgentPhotoFile(null);
@@ -1040,14 +1074,14 @@ export default function BlicPayAdmin() {
         const [, base64] = reader.result.split(',');
         resolve(base64);
       };
-      reader.onerror = () => reject(new Error('Nou pa t ka li fichye a.'));
+      reader.onerror = () => reject(new Error(tt("Nou pa t ka li fichye a.")));
       reader.readAsDataURL(file);
     });
   }
 
   async function uploadSolDocument(membershipId) {
-    if (!solDocTitle.trim()) { flash('Bay dokiman an yon tit.'); return; }
-    if (!solDocFile) { flash('Chwazi yon fichye anvan.'); return; }
+    if (!solDocTitle.trim()) { flash(tt("Bay dokiman an yon tit.")); return; }
+    if (!solDocFile) { flash(tt("Chwazi yon fichye anvan.")); return; }
     setSolDocUploadingFor(membershipId);
     try {
       const fileData = await readFileAsBase64(solDocFile);
@@ -1055,7 +1089,7 @@ export default function BlicPayAdmin() {
         method: 'POST', token,
         body: { title: solDocTitle.trim(), fileData, fileMimeType: solDocFile.type, fileName: solDocFile.name },
       });
-      flash('Dokiman an telechaje.');
+      flash(tt("Dokiman an telechaje."));
       setSolDocTitle('');
       setSolDocFile(null);
       if (selectedUser) openUser(selectedUser);
@@ -1067,7 +1101,7 @@ export default function BlicPayAdmin() {
       await apiFetch(`/admin/sol/memberships/${membershipId}/form-approve`, {
         method: 'PATCH', token, body: { approved },
       });
-      flash(approved ? 'Dokiman Sòl konfime.' : 'Estati dokiman an remèt an atant.');
+      flash(approved ? tt("Dokiman Sòl konfime.") : tt("Estati dokiman an remèt an atant."));
       if (selectedUser) openUser(selectedUser);
     } catch (err) { flash(err.message); }
   }
@@ -1077,7 +1111,7 @@ export default function BlicPayAdmin() {
       await apiFetch(`/admin/users/${u.id}/block`, { method: 'PATCH', token, body: { blocked: !u.blocked } });
       setUsers((us) => us.map((x) => x.id === u.id ? { ...x, blocked: !u.blocked } : x));
       if (selectedUser?.id === u.id) setSelectedUser((s) => ({ ...s, blocked: !u.blocked }));
-      flash(!u.blocked ? 'Kont bloke.' : 'Kont debloke.');
+      flash(!u.blocked ? tt("Kont bloke.") : tt("Kont debloke."));
     } catch (err) { flash(err.message); }
   }
 
@@ -1086,15 +1120,15 @@ export default function BlicPayAdmin() {
       await apiFetch(`/admin/users/${u.id}/verify`, { method: 'PATCH', token, body: { verified: !u.verified } });
       setUsers((us) => us.map((x) => x.id === u.id ? { ...x, verified: !u.verified } : x));
       if (selectedUser?.id === u.id) setSelectedUser((s) => ({ ...s, verified: !u.verified }));
-      flash(!u.verified ? 'Kont verifye.' : 'Verifikasyon retire.');
+      flash(!u.verified ? tt("Kont verifye.") : tt("Verifikasyon retire."));
     } catch (err) { flash(err.message); }
   }
 
   async function submitBalanceAdjust() {
     if (!selectedUser) return;
     const amt = Number(adjustAmount);
-    if (!amt) { flash('Antre yon montan valab.'); return; }
-    if (!adjustReason.trim()) { flash('Yon rezon obligatwa.'); return; }
+    if (!amt) { flash(tt("Antre yon montan valab.")); return; }
+    if (!adjustReason.trim()) { flash(tt("Yon rezon obligatwa.")); return; }
     try {
       const { newBalance } = await apiFetch(`/admin/users/${selectedUser.id}/adjust-balance`, {
         method: 'POST', token, body: { amount: amt, reason: adjustReason.trim() },
@@ -1103,27 +1137,27 @@ export default function BlicPayAdmin() {
       setSelectedUser((s) => ({ ...s, balance: newBalance }));
       setAdjustAmount('');
       setAdjustReason('');
-      flash('Balans ajiste.');
+      flash(tt("Balans ajiste."));
     } catch (err) { flash(err.message); }
   }
 
   function enterDemoMode() {
     setToken(DEMO_TOKEN);
     setAdmin({ fullName: 'Admin Demo' });
-    flash('Mòd demo — pa gen vre done.');
+    flash(tt("Mòd demo — pa gen vre done."));
   }
 
   async function handleLogin() {
     setLoginError('');
     if (!loginForm.phone.trim() || !loginForm.password) {
-      setLoginError('Nimewo telefòn ak modpas obligatwa.');
+      setLoginError(tt("Nimewo telefòn ak modpas obligatwa."));
       return;
     }
     setLoginLoading(true);
     try {
       const { token: newToken, user } = await apiFetch('/auth/login', { method: 'POST', body: loginForm });
       if (user.role !== 'admin' && user.role !== 'agent') {
-        setLoginError('Kont sa a pa gen aksè admin.');
+        setLoginError(tt("Kont sa a pa gen aksè admin."));
         return;
       }
       setToken(newToken);
@@ -1149,15 +1183,15 @@ export default function BlicPayAdmin() {
   async function changePassword() {
     setPwError('');
     if (!pwForm.current || !pwForm.next) {
-      setPwError('Ranpli tout chan yo.');
+      setPwError(tt("Ranpli tout chan yo."));
       return;
     }
     if (pwForm.next.length < 6) {
-      setPwError('Nouvo modpas la dwe gen omwen 6 karaktè.');
+      setPwError(tt("Nouvo modpas la dwe gen omwen 6 karaktè."));
       return;
     }
     if (pwForm.next !== pwForm.confirm) {
-      setPwError('De nouvo modpas yo pa menm.');
+      setPwError(tt("De nouvo modpas yo pa menm."));
       return;
     }
     setPwBusy(true);
@@ -1190,8 +1224,8 @@ export default function BlicPayAdmin() {
     try {
       if (token !== DEMO_TOKEN) await apiFetch(`/admin/deposits/${id}/confirm`, { method: 'POST', token });
       setPending((p) => p.filter((d) => d.id !== id));
-      setConfirmed((c) => [{ id: 'c-' + Date.now(), user: dep.user, method: dep.method, amount: dep.amount, time: 'kounye a' }, ...c]);
-      flash(`Depo ${dep.user} la konfime.`);
+      setConfirmed((c) => [{ id: 'c-' + Date.now(), user: dep.user, method: dep.method, amount: dep.amount, time: tt("kounye a") }, ...c]);
+      flash(tt("Depo {0} la konfime.", dep.user));
     } catch (err) { flash(err.message); }
   }
 
@@ -1201,7 +1235,7 @@ export default function BlicPayAdmin() {
     try {
       if (token !== DEMO_TOKEN) await apiFetch(`/admin/deposits/${id}/reject`, { method: 'POST', token });
       setPending((p) => p.filter((d) => d.id !== id));
-      flash(`Depo ${dep.user} la rejte.`);
+      flash(tt("Depo {0} la rejte.", dep.user));
     } catch (err) { flash(err.message); }
   }
 
@@ -1212,21 +1246,21 @@ export default function BlicPayAdmin() {
         const base64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = () => reject(new Error('Nou pa t ka li foto a.'));
+          reader.onerror = () => reject(new Error(tt("Nou pa t ka li foto a.")));
           reader.readAsDataURL(proofFile);
         });
         body = { proofImage: base64, proofMimeType: proofFile.type };
       }
       await apiFetch(`/admin/withdrawals/${id}/confirm`, { method: 'POST', token, body });
       setWithdrawals((w) => w.filter((x) => x.id !== id));
-      flash('Retrè konfime.');
+      flash(tt("Retrè konfime."));
     } catch (err) { flash(err.message); }
   }
   async function rejectWithdrawal(id) {
     try {
       await apiFetch(`/admin/withdrawals/${id}/reject`, { method: 'POST', token });
       setWithdrawals((w) => w.filter((x) => x.id !== id));
-      flash('Retrè refize — lajan an remèt.');
+      flash(tt("Retrè refize — lajan an remèt."));
     } catch (err) { flash(err.message); }
   }
 
@@ -1234,14 +1268,14 @@ export default function BlicPayAdmin() {
     try {
       await apiFetch(`/admin/loans/${id}/approve`, { method: 'POST', token });
       loadLoans();
-      flash('Prè apwouve.');
+      flash(tt("Prè apwouve."));
     } catch (err) { flash(err.message); }
   }
   async function rejectLoan(id) {
     try {
       await apiFetch(`/admin/loans/${id}/reject`, { method: 'POST', token });
       loadLoans();
-      flash('Prè refize.');
+      flash(tt("Prè refize."));
     } catch (err) { flash(err.message); }
   }
 
@@ -1250,20 +1284,20 @@ export default function BlicPayAdmin() {
       await apiFetch(`/admin/sol/requests/${id}/approve`, { method: 'POST', token, body: turnIndex ? { turnIndex } : {} });
       setSolRequests((r) => r.filter((x) => x.id !== id));
       setApprovingSolId(null);
-      flash('Demand adezyon apwouve.');
+      flash(tt("Demand adezyon apwouve."));
     } catch (err) { flash(err.message); }
   }
   async function rejectSol(id) {
     try {
       await apiFetch(`/admin/sol/requests/${id}/reject`, { method: 'POST', token });
       setSolRequests((r) => r.filter((x) => x.id !== id));
-      flash('Demand adezyon refize.');
+      flash(tt("Demand adezyon refize."));
     } catch (err) { flash(err.message); }
   }
   async function reassignSolPosition(groupId, membershipId, turnIndex) {
     try {
       await apiFetch(`/admin/sol/groups/${groupId}/members/${membershipId}/position`, { method: 'PATCH', token, body: { turnIndex } });
-      flash('Pozisyon chanje.');
+      flash(tt("Pozisyon chanje."));
       openSolGroup(selectedSolGroup);
     } catch (err) { flash(err.message); }
   }
@@ -1280,21 +1314,21 @@ export default function BlicPayAdmin() {
   const pendingLoansCount = loans.filter((l) => l.status === 'pending').length;
 
   const NAV_ITEMS_ALL = [
-    { id: 'overview', label: 'Apèsi', icon: LayoutGrid, onOpen: () => { loadExchangeRate(); loadFinance('all'); loadReserves(); }, adminOnly: true },
-    { id: 'finance', label: 'Finans', icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
-    { id: 'pending', label: 'Depo', icon: Wallet, count: pending.length },
-    { id: 'withdrawals', label: 'Retrait', icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
-    { id: 'goals', label: 'Depo Objektif', icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
-    { id: 'loans', label: 'Prè', icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: false },
-    { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
-    { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: false },
-    { id: 'solPayouts', label: 'Pòch Sòl resevwa', icon: HandCoins, onOpen: () => loadSolPayouts(), adminOnly: false },
-    { id: 'business', label: 'Antrepriz', icon: Building2, adminOnly: true },
-    { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
-    { id: 'verificationRequests', label: 'Dokiman Siplemantè', icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
-    { id: 'support', label: 'Mesaj Sipò', icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
-    { id: 'users', label: 'Itilizatè', icon: User, onOpen: () => loadUsers(), adminOnly: true },
-    { id: 'agents', label: 'Ajan', icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
+    { id: 'overview', label: tt("Apèsi"), icon: LayoutGrid, onOpen: () => { loadExchangeRate(); loadFinance('all'); loadReserves(); }, adminOnly: true },
+    { id: 'finance', label: tt("Finans"), icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
+    { id: 'pending', label: tt("Depo"), icon: Wallet, count: pending.length },
+    { id: 'withdrawals', label: tt("Retrait"), icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
+    { id: 'goals', label: tt("Depo Objektif"), icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
+    { id: 'loans', label: tt("Prè"), icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: false },
+    { id: 'transfers', label: tt("Transfè"), icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
+    { id: 'sol', label: tt("BLIC Sòl"), icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: false },
+    { id: 'solPayouts', label: tt("Pòch Sòl resevwa"), icon: HandCoins, onOpen: () => loadSolPayouts(), adminOnly: false },
+    { id: 'business', label: tt("Antrepriz"), icon: Building2, adminOnly: true },
+    { id: 'kyc', label: tt("Verifikasyon KYC"), icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
+    { id: 'verificationRequests', label: tt("Dokiman Siplemantè"), icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
+    { id: 'support', label: tt("Mesaj Sipò"), icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
+    { id: 'users', label: tt("Itilizatè"), icon: User, onOpen: () => loadUsers(), adminOnly: true },
+    { id: 'agents', label: tt("Ajan"), icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
   ];
   const NAV_ITEMS = NAV_ITEMS_ALL.filter((item) => !item.adminOnly || admin?.role === 'admin');
 
@@ -1317,21 +1351,22 @@ export default function BlicPayAdmin() {
         <div style={{ position: 'absolute', bottom: -140, left: -100, width: 320, height: 320, borderRadius: '50%', background: 'rgba(44,143,176,0.08)' }} />
 
         <div className="w-full max-w-sm rounded-lg relative" style={{ background: C.card, padding: '32px 28px', border: `1px solid ${C.navy}`, boxShadow: '0px 12px 32px -4px rgba(10,33,64,0.28)' }}>
+          <div className="absolute top-4 right-4"><LangSwitch lang={lang} setLang={setLang} /></div>
           <div className="flex items-center gap-2">
             <Logo size={28} />
             <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 18, color: C.ink }}>
-              BLIC<span style={{ color: C.gold }}>Pay</span>
+              {tt("BLIC")}<span style={{ color: C.gold }}>{tt("Pay")}</span>
             </span>
           </div>
-          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 21, color: C.ink, marginTop: 18 }}>Byenveni</h1>
-          <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>Konekte pou jere kont BLICPay yo.</p>
+          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 21, color: C.ink, marginTop: 18 }}>{tt("Byenveni")}</h1>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>{tt("Konekte pou jere kont BLICPay yo.")}</p>
 
           <div style={{ marginTop: 24 }} className="space-y-3">
-            <input placeholder="Nimewo telefòn" value={loginForm.phone}
+            <input placeholder={tt("Nimewo telefòn")} value={loginForm.phone}
               onChange={(e) => setLoginForm((f) => ({ ...f, phone: e.target.value }))}
               className="w-full px-4 py-3 rounded-lg text-sm"
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.ink }} />
-            <input placeholder="Modpas" type="password" value={loginForm.password}
+            <input placeholder={tt("Modpas")} type="password" value={loginForm.password}
               onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
               className="w-full px-4 py-3 rounded-lg text-sm"
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.ink }} />
@@ -1343,7 +1378,7 @@ export default function BlicPayAdmin() {
           )}
           <button onClick={handleLogin} disabled={loginLoading}
             className="bp-btn w-full py-3 rounded-lg font-semibold text-white" style={{ marginTop: 20, background: C.navy, opacity: loginLoading ? 0.7 : 1 }}>
-            {loginLoading ? 'Tann...' : 'Konekte'}
+            {loginLoading ? tt("Tann...") : tt("Konekte")}
           </button>
         </div>
       </div>
@@ -1379,10 +1414,10 @@ export default function BlicPayAdmin() {
             <div className="flex items-center gap-2.5">
               <div className="rounded-lg flex items-center justify-center font-extrabold text-white" style={{ width: 30, height: 30, background: C.navy, border: `1px solid ${C.gold}` }}>B</div>
               <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', letterSpacing: -0.2 }}>
-                BLIC<span style={{ color: C.gold }}>Pay</span>
+                {tt("BLIC")}<span style={{ color: C.gold }}>{tt("Pay")}</span>
               </span>
               <span className="hidden lg:inline-block text-[10px] uppercase font-semibold rounded" style={{ ...fontMono, padding: '2px 7px', background: C.navy, color: '#9fb0c7', border: '1px solid #334', letterSpacing: 0.6 }}>
-                Panèl Admin
+                {tt("Panèl Admin")}
               </span>
             </div>
 
@@ -1393,15 +1428,15 @@ export default function BlicPayAdmin() {
               border: '1px solid rgba(185,134,47,0.35)', letterSpacing: 0.2,
             }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.gold, display: 'inline-block' }} />
-              {admin?.role === 'agent' ? `Ajan · ${admin?.branch || ''}` : 'Sipè Admin — Aksè Konplè'}
+              {admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch || '') : tt("Sipè Admin — Aksè Konplè")}
             </div>
           </div>
           <div className="flex items-center" style={{ gap: 18 }}>
             <div className="hidden sm:block text-right">
               <p style={{ ...fontMono, fontSize: 11, color: '#c7d0dd' }}>
-                {clock.toLocaleTimeString('fr-FR')} <span style={{ color: '#7a8aa3' }}>HTG (UTC-5)</span>
+                {clock.toLocaleTimeString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')} <span style={{ color: '#7a8aa3' }}>{tt("HTG (UTC-5)")}</span>
               </p>
-              <p className="text-[10px]" style={{ color: '#7a8aa3' }}>{clock.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+              <p className="text-[10px]" style={{ color: '#7a8aa3' }}>{clock.toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
             </div>
 
             <button onClick={() => setNotifPanelOpen((o) => !o)} className="w-8 h-8 rounded-full flex items-center justify-center relative" style={{ background: 'rgba(255,255,255,0.1)' }}>
@@ -1422,14 +1457,15 @@ export default function BlicPayAdmin() {
               <div>
                 <p className="text-sm font-semibold" style={{ color: '#fff', lineHeight: 1.2 }}>{admin?.fullName}</p>
                 <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.2 }}>
-                  {admin?.role === 'agent' ? `Ajan · ${admin?.branch}` : 'Sipè admin'}
+                  {admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch) : tt("Sipè admin")}
                 </p>
               </div>
             </div>
-            <button onClick={openPasswordModal} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label="Chanje modpas" title="Chanje modpas">
+            <LangSwitch lang={lang} setLang={setLang} dark />
+            <button onClick={openPasswordModal} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label={tt("Chanje modpas")} title={tt("Chanje modpas")}>
               <KeyRound size={15} color="#fff" />
             </button>
-            <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label="Dekonekte">
+            <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label={tt("Dekonekte")}>
               <LogOut size={15} color="#fff" />
             </button>
           </div>
@@ -1471,16 +1507,16 @@ export default function BlicPayAdmin() {
             display: 'flex', flexDirection: 'column',
           }}>
             <div className="flex items-center justify-between" style={{ padding: '12px 16px', borderBottom: `1px solid ${C.border}` }}>
-              <p className="text-sm font-bold" style={{ color: C.ink }}>Notifikasyon</p>
+              <p className="text-sm font-bold" style={{ color: C.ink }}>{tt("Notifikasyon")}</p>
               {unreadCount > 0 && (
                 <button onClick={markAllNotificationsRead} className="text-xs font-semibold" style={{ color: C.navy }}>
-                  Make tout li
+                  {tt("Make tout li")}
                 </button>
               )}
             </div>
             <div style={{ overflowY: 'auto' }}>
               {notifications.length === 0 ? (
-                <p className="text-sm text-center" style={{ color: C.muted, padding: '32px 16px' }}>Pa gen notifikasyon toujou.</p>
+                <p className="text-sm text-center" style={{ color: C.muted, padding: '32px 16px' }}>{tt("Pa gen notifikasyon toujou.")}</p>
               ) : notifications.map((n, i) => (
                 <button key={n.id} onClick={() => !n.read && markNotificationRead(n.id)}
                   className="bp-btn w-full text-left" style={{
@@ -1518,10 +1554,10 @@ export default function BlicPayAdmin() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink }}>
-                    Bonjou, {admin?.fullName}
+                    {tt("Bonjou,")} {admin?.fullName}
                   </h1>
                   <p className="text-xs mt-1" style={{ color: C.muted }}>
-                    📅 {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    📅 {new Date().toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                   </p>
                 </div>
               </div>
@@ -1530,7 +1566,7 @@ export default function BlicPayAdmin() {
               <div className="rounded-2xl p-6 text-white relative overflow-hidden" style={{ marginTop: 18, background: `linear-gradient(120deg, ${C.navyDeep}, ${C.navy} 60%, #133863)`, border: `1px solid ${C.navy}` }}>
                 <div style={{ position: 'absolute', right: -60, top: -60, width: 280, height: 280, borderRadius: '50%', background: 'rgba(185,134,47,0.10)', filter: 'blur(50px)', pointerEvents: 'none' }} />
                 <div className="relative">
-                  <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>Balans Total Tout Pwodwi BLICPay</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>{tt("Balans Total Tout Pwodwi BLICPay")}</p>
                   <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 6 }}>
                     <span style={{ ...fontMono, fontSize: 34, fontWeight: 800, color: '#fff' }}>{money(totalBalance)}</span>
                     {exchangeRate && (
@@ -1540,24 +1576,24 @@ export default function BlicPayAdmin() {
                     )}
                   </div>
                   {exchangeRate && (
-                    <p className="text-[10px] mt-1" style={{ ...fontMono, color: 'rgba(255,255,255,0.5)' }}>Tal BRH: 1 USD = {exchangeRate.rate} HTG ({exchangeRate.rateDate})</p>
+                    <p className="text-[10px] mt-1" style={{ ...fontMono, color: 'rgba(255,255,255,0.5)' }}>{tt("Tal BRH: 1 USD =")} {exchangeRate.rate} {tt("HTG (")}{exchangeRate.rateDate})</p>
                   )}
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs" style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
                     <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Volim Depo (tout tan)</p>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Volim Depo (tout tan)")}</p>
                       <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(totalDeposit)}</p>
                     </div>
                     <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Fon BLIC Sòl Potansyèl</p>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Fon BLIC Sòl Potansyèl")}</p>
                       <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(solFundTotal)}</p>
                     </div>
                     <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Pòtfèy Prè Ankou</p>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Pòtfèy Prè Ankou")}</p>
                       <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(loanOutstanding)}</p>
                     </div>
                     <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>Rezèv MonCash+NatCash</p>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Rezèv MonCash+NatCash")}</p>
                       <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: C.gold, marginTop: 3 }}>{money(totalReserve)}</p>
                     </div>
                   </div>
@@ -1567,10 +1603,10 @@ export default function BlicPayAdmin() {
               {/* 4 kat KPI operasyonèl, style Stitch */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginTop: 18 }}>
                 {[
-                  { label: 'Depo Ap Tann Validasyon', value: `${pending.length} demann`, sub: money(totalPendingAmount), tone: '#8A6423', bg: '#FBF0DE', tab: 'pending' },
-                  { label: 'Demann Retrè Ap Tann', value: `${withdrawals.length} demann`, sub: money(totalWithdrawAmount), tone: C.danger, bg: '#FBEBE6', tab: 'withdrawals' },
-                  { label: 'Aderans BLIC Sòl', value: `${solRequests.length} demann`, sub: 'ap tann apwobasyon', tone: C.purple, bg: '#F4EBFF', tab: 'sol' },
-                  { label: 'Dosye KYC Pou Tcheke', value: `${kycSubmissions.length} dosye`, sub: 'ap tann egzamen', tone: C.navy, bg: '#E6F0FB', tab: 'kyc' },
+                  { label: tt("Depo Ap Tann Validasyon"), value: tt("{0} demann", pending.length), sub: money(totalPendingAmount), tone: '#8A6423', bg: '#FBF0DE', tab: 'pending' },
+                  { label: tt("Demann Retrè Ap Tann"), value: tt("{0} demann", withdrawals.length), sub: money(totalWithdrawAmount), tone: C.danger, bg: '#FBEBE6', tab: 'withdrawals' },
+                  { label: tt("Aderans BLIC Sòl"), value: tt("{0} demann", solRequests.length), sub: tt("ap tann apwobasyon"), tone: C.purple, bg: '#F4EBFF', tab: 'sol' },
+                  { label: tt("Dosye KYC Pou Tcheke"), value: tt("{0} dosye", kycSubmissions.length), sub: tt("ap tann egzamen"), tone: C.navy, bg: '#E6F0FB', tab: 'kyc' },
                 ].map((c) => (
                   <button key={c.label} onClick={() => setNav(c.tab)} className="bp-btn text-left bg-white rounded-xl" style={{ padding: 16, border: `1px solid ${C.border}` }}>
                     <div className="flex items-center justify-between">
@@ -1589,20 +1625,20 @@ export default function BlicPayAdmin() {
               <div className="bg-white rounded-2xl overflow-hidden" style={{ marginTop: 20, border: `1px solid ${C.border}` }}>
                 <div className="flex items-center justify-between" style={{ padding: 16, borderBottom: `1px solid ${C.border}` }}>
                   <div>
-                    <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: C.ink }}>Dènye Depo Ap Tann</h2>
-                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>Tout metòd — MonCash, NatCash, biwo</p>
+                    <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: C.ink }}>{tt("Dènye Depo Ap Tann")}</h2>
+                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt("Tout metòd — MonCash, NatCash, biwo")}</p>
                   </div>
                   <button onClick={() => setNav('pending')} className="text-xs font-semibold flex items-center gap-1" style={{ color: C.navy }}>
-                    Wè tout <ChevronRight size={13} />
+                    {tt("Wè tout")} <ChevronRight size={13} />
                   </button>
                 </div>
                 {pending.length === 0 ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Pa gen depo k'ap tann.</p>
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Pa gen depo k'ap tann.")}</p>
                 ) : (
                   <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
                     <thead>
                       <tr style={{ background: C.bg }}>
-                        <Th>Kliyan</Th><Th>Referans</Th><Th align="right">Montan</Th><Th align="center">Estati</Th>
+                        <Th>{tt("Kliyan")}</Th><Th>{tt("Referans")}</Th><Th align="right">{tt("Montan")}</Th><Th align="center">{tt("Estati")}</Th>
                       </tr>
                     </thead>
                     <tbody className="text-xs">
@@ -1623,7 +1659,7 @@ export default function BlicPayAdmin() {
                             </Td>
                             <Td><span style={{ ...fontMono, fontSize: 11 }}>{d.reference}</span></Td>
                             <Td align="right"><span style={{ ...fontMono, fontWeight: 700 }}>+{money(d.amount)}</span></Td>
-                            <Td align="center"><Badge tone="amber">Ap tann</Badge></Td>
+                            <Td align="center"><Badge tone="amber">{tt("Ap tann")}</Badge></Td>
                           </tr>
                         );
                       })}
@@ -1639,18 +1675,18 @@ export default function BlicPayAdmin() {
             <div className="fadein">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Depo</h1>
-                  <p className="text-sm mt-1" style={{ color: C.muted }}>Konfime oswa rejte demand depo yo.</p>
+                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Depo")}</h1>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Konfime oswa rejte demand depo yo.")}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   {depositView === 'pending' && (
                     <div className="relative">
                       <Search size={14} color={C.muted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Chèche non oswa referans"
+                      <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tt("Chèche non oswa referans")}
                         className="pl-8 pr-3 py-2 rounded-lg text-sm" style={{ background: C.card, border: `1px solid ${C.border}`, width: 220 }} />
                     </div>
                   )}
-                  <button onClick={() => depositView === 'pending' ? loadPending(token) : loadDepositHistory()} aria-label="Rafrechi"
+                  <button onClick={() => depositView === 'pending' ? loadPending(token) : loadDepositHistory()} aria-label={tt("Rafrechi")}
                     className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                     style={{ background: C.card, border: `1px solid ${C.border}` }}>
                     <RefreshCw size={14} color={C.muted} style={(loadingPending || loadingDepositHistory) ? { animation: 'spin 0.8s linear infinite' } : undefined} />
@@ -1663,13 +1699,13 @@ export default function BlicPayAdmin() {
                   className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
                     background: depositView === 'pending' ? C.navy : C.card, color: depositView === 'pending' ? '#fff' : C.muted,
                     border: `1px solid ${depositView === 'pending' ? C.navy : C.border}` }}>
-                  Ap tann
+                  {tt("Ap tann")}
                 </button>
                 <button onClick={() => { setDepositView('history'); if (depositHistory.length === 0) loadDepositHistory(); }}
                   className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
                     background: depositView === 'history' ? C.navy : C.card, color: depositView === 'history' ? '#fff' : C.muted,
                     border: `1px solid ${depositView === 'history' ? C.navy : C.border}` }}>
-                  Istorik
+                  {tt("Istorik")}
                 </button>
               </div>
 
@@ -1677,7 +1713,7 @@ export default function BlicPayAdmin() {
               <>
               <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                 {filteredPending.length === 0 ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen okenn rezilta.</p>
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Pa gen okenn rezilta.")}</p>
                 ) : filteredPending.map((d, i) => {
                   const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
                   return (
@@ -1695,32 +1731,32 @@ export default function BlicPayAdmin() {
                           )}
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{d.reference}</p>
                           {d.transactionId && (
-                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>TID: {d.transactionId}</p>
+                            <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.navy }}>{tt("TID:")} {d.transactionId}</p>
                           )}
                         </div>
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="text-right">
                           <p style={{ ...fontMono, fontSize: 15, fontWeight: 600 }}>{money(d.amount)}</p>
-                          <Badge tone="amber">{M.label}</Badge>
+                          <Badge tone="amber">{tt(M.label)}</Badge>
                         </div>
                         {d.proofImage && (
                           <button onClick={() => setViewingReceipt(d)}
                             className="bp-btn w-9 h-9 rounded-lg flex items-center justify-center"
-                            style={{ border: `1px solid ${C.border}` }} aria-label="Wè resi a">
+                            style={{ border: `1px solid ${C.border}` }} aria-label={tt("Wè resi a")}>
                             <Eye size={15} color={C.navy} />
                           </button>
                         )}
                         <div className="flex items-center gap-2">
                           <button onClick={() => rejectDeposit(d.id)}
                             className="bp-btn w-9 h-9 rounded-lg flex items-center justify-center"
-                            style={{ border: `1px solid ${C.border}` }} aria-label="Rejte">
+                            style={{ border: `1px solid ${C.border}` }} aria-label={tt("Rejte")}>
                             <X size={15} color={C.danger} />
                           </button>
                           <button onClick={() => setConfirmingDeposit(d)}
                             className="bp-btn px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5"
                             style={{ background: C.mint, color: '#fff' }}>
-                            <Check size={13} /> Konfime
+                            <Check size={13} /> {tt("Konfime@@btn")}
                           </button>
                         </div>
                       </div>
@@ -1734,9 +1770,9 @@ export default function BlicPayAdmin() {
               {depositView === 'history' && (
                 <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                   {loadingDepositHistory ? (
-                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Ap chaje...</p>
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Ap chaje...")}</p>
                   ) : depositHistory.length === 0 ? (
-                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen istorik toujou.</p>
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Pa gen istorik toujou.")}</p>
                   ) : depositHistory.map((d, i) => {
                     const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
                     return (
@@ -1748,13 +1784,13 @@ export default function BlicPayAdmin() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{d.user}</p>
-                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{M.label} · {d.date}{d.branch ? ` · 📍 ${d.branch}` : ''}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt(M.label)} · {d.date}{d.branch ? ` · 📍 ${d.branch}` : ''}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
                           <span style={fontMono} className="text-sm font-semibold">{money(d.amount)}</span>
                           <Badge tone={d.status === 'confirmed' ? 'mint' : d.status === 'rejected' ? 'danger' : 'amber'}>
-                            {d.status === 'confirmed' ? 'Konfime' : d.status === 'rejected' ? 'Refize' : 'Ap tann'}
+                            {d.status === 'confirmed' ? tt("Konfime") : d.status === 'rejected' ? tt("Refize") : tt("Ap tann")}
                           </Badge>
                         </div>
                       </div>
@@ -1766,7 +1802,7 @@ export default function BlicPayAdmin() {
               {depositView === 'pending' && (
               <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
-                Verifye referans lan ak resi kach la anvan ou konfime yon depo biwo.
+                {tt("Verifye referans lan ak resi kach la anvan ou konfime yon depo biwo.")}
               </div>
               )}
             </div>
@@ -1776,10 +1812,10 @@ export default function BlicPayAdmin() {
             <div className="fadein">
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Retrait</h1>
-                  <p className="text-sm mt-1" style={{ color: C.muted }}>Konfime oswa rejte demand retrè yo. Yon retrè refize remèt lajan an bay kliyan an.</p>
+                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Retrait")}</h1>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Konfime oswa rejte demand retrè yo. Yon retrè refize remèt lajan an bay kliyan an.")}</p>
                 </div>
-                <button onClick={() => withdrawalView === 'pending' ? loadWithdrawals(token) : loadWithdrawalHistory()} aria-label="Rafrechi"
+                <button onClick={() => withdrawalView === 'pending' ? loadWithdrawals(token) : loadWithdrawalHistory()} aria-label={tt("Rafrechi")}
                   className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
                   style={{ background: C.card, border: `1px solid ${C.border}` }}>
                   <RefreshCw size={14} color={C.muted} style={(loadingWithdrawals || loadingWithdrawalHistory) ? { animation: 'spin 0.8s linear infinite' } : undefined} />
@@ -1791,13 +1827,13 @@ export default function BlicPayAdmin() {
                   className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
                     background: withdrawalView === 'pending' ? C.navy : C.card, color: withdrawalView === 'pending' ? '#fff' : C.muted,
                     border: `1px solid ${withdrawalView === 'pending' ? C.navy : C.border}` }}>
-                  Ap tann
+                  {tt("Ap tann")}
                 </button>
                 <button onClick={() => { setWithdrawalView('history'); if (withdrawalHistory.length === 0) loadWithdrawalHistory(); }}
                   className="bp-btn rounded-lg text-xs font-semibold" style={{ padding: '7px 13px',
                     background: withdrawalView === 'history' ? C.navy : C.card, color: withdrawalView === 'history' ? '#fff' : C.muted,
                     border: `1px solid ${withdrawalView === 'history' ? C.navy : C.border}` }}>
-                  Istorik
+                  {tt("Istorik")}
                 </button>
               </div>
 
@@ -1812,24 +1848,24 @@ export default function BlicPayAdmin() {
                 {/* Metrik reyèl — pa gen chif envante */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3" style={{ marginTop: 20 }}>
                   <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
-                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Total Ap Tann</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{tt("Total Ap Tann")}</p>
                     <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: C.ink, marginTop: 4 }}>{money(totalPending)}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{withdrawals.length} tranzaksyon</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{withdrawals.length} {tt("tranzaksyon")}</p>
                   </div>
                   <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
-                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Rezèv MonCash</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{tt("Rezèv MonCash")}</p>
                     <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: C.ink, marginTop: 4 }}>{money(moncashReserve)}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>Mete ajou alamen</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{tt("Mete ajou alamen")}</p>
                   </div>
                   <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
-                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Rezèv NatCash</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{tt("Rezèv NatCash")}</p>
                     <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: '#1C6FBF', marginTop: 4 }}>{money(natcashReserve)}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>Mete ajou alamen</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{tt("Mete ajou alamen")}</p>
                   </div>
                   <div className="bg-white border rounded-lg p-3.5" style={{ borderColor: C.border }}>
-                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>Pi Gwo Demand</p>
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{tt("Pi Gwo Demand")}</p>
                     <p style={{ ...fontMono, fontSize: 15, fontWeight: 800, color: C.navy, marginTop: 4 }}>{money(biggestPending)}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>Nan fil datant lan</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: C.muted }}>{tt("Nan fil datant lan")}</p>
                   </div>
                 </div>
 
@@ -1838,16 +1874,16 @@ export default function BlicPayAdmin() {
                   <div className="xl:col-span-7">
                     <div className="bg-white border rounded-lg overflow-hidden" style={{ borderColor: C.border }}>
                       {loadingWithdrawals ? (
-                        <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                        <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
                       ) : withdrawals.length === 0 ? (
-                        <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Pa gen retrè k'ap tann.</p>
+                        <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Pa gen retrè k'ap tann.")}</p>
                       ) : (
                         <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
                           <thead>
                             <tr style={{ background: C.bg, borderBottom: `1px solid ${C.border}` }}>
-                              <Th>Kliyan</Th>
-                              <Th>Metòd & Kont</Th>
-                              <Th align="right">Montan</Th>
+                              <Th>{tt("Kliyan")}</Th>
+                              <Th>{tt("Metòd & Kont")}</Th>
+                              <Th align="right">{tt("Montan")}</Th>
                               <Th align="right"></Th>
                             </tr>
                           </thead>
@@ -1870,12 +1906,12 @@ export default function BlicPayAdmin() {
                                     </div>
                                   </Td>
                                   <Td>
-                                    <Badge tone="amber">{M.label}</Badge>
+                                    <Badge tone="amber">{tt(M.label)}</Badge>
                                     {w.destinationNumber && <p style={{ ...fontMono, fontSize: 11, fontWeight: 700, color: C.ink, marginTop: 4 }}>{w.destinationNumber}</p>}
                                     {w.destinationNumber && (
                                       namesMatch(w.user, w.destinationName)
-                                        ? <p className="text-[10px]" style={{ color: '#2B5842' }}>✓ Non korespondan</p>
-                                        : <p className="text-[10px]" style={{ color: '#8E341F' }}>⚠ Non diferan</p>
+                                        ? <p className="text-[10px]" style={{ color: '#2B5842' }}>{tt("✓ Non korespondan")}</p>
+                                        : <p className="text-[10px]" style={{ color: '#8E341F' }}>{tt("⚠ Non diferan")}</p>
                                     )}
                                   </Td>
                                   <Td align="right">
@@ -1884,7 +1920,7 @@ export default function BlicPayAdmin() {
                                   </Td>
                                   <Td align="right">
                                     <button onClick={(e) => { e.stopPropagation(); rejectWithdrawal(w.id); }}
-                                      className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ border: `1px solid ${C.border}` }} aria-label="Rejte">
+                                      className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ border: `1px solid ${C.border}` }} aria-label={tt("Rejte")}>
                                       <X size={13} color={C.danger} />
                                     </button>
                                   </Td>
@@ -1904,16 +1940,16 @@ export default function BlicPayAdmin() {
                         <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
                           <Search size={18} color={C.muted} />
                         </div>
-                        <p className="text-sm" style={{ color: C.muted }}>Chwazi yon retrè nan lis la pou enspekte epi konfime li.</p>
+                        <p className="text-sm" style={{ color: C.muted }}>{tt("Chwazi yon retrè nan lis la pou enspekte epi konfime li.")}</p>
                       </div>
                     ) : (
                       <div className="rounded-lg" style={{ background: '#fff', border: `2px solid ${C.navy}`, padding: 20 }}>
                         <div className="flex items-center justify-between" style={{ paddingBottom: 14, borderBottom: `1px solid ${C.border}` }}>
                           <div>
-                            <p style={{ ...fontMono, fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>Enspeksyon retrè</p>
+                            <p style={{ ...fontMono, fontSize: 10, color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 }}>{tt("Enspeksyon retrè")}</p>
                             <p className="text-base font-extrabold" style={{ color: C.navy }}>{confirmingWithdrawal.reference}</p>
                           </div>
-                          <Badge tone="amber">Mande Validasyon</Badge>
+                          <Badge tone="amber">{tt("Mande Validasyon")}</Badge>
                         </div>
 
                         <div className="rounded-lg" style={{ background: C.bg, border: `1px solid ${C.border}`, padding: 14, marginTop: 14 }}>
@@ -1926,49 +1962,49 @@ export default function BlicPayAdmin() {
                                 <p className="text-sm font-extrabold" style={{ color: C.ink }}>{confirmingWithdrawal.user}</p>
                                 <p style={{ ...fontMono, fontSize: 11, color: C.muted }}>{confirmingWithdrawal.phone}</p>
                                 {confirmingWithdrawal.balance != null && (
-                                  <p style={{ ...fontMono, fontSize: 10, color: C.muted }}>Balans: <span style={{ fontWeight: 700, color: C.ink }}>{money(confirmingWithdrawal.balance)}</span></p>
+                                  <p style={{ ...fontMono, fontSize: 10, color: C.muted }}>{tt("Balans:")} <span style={{ fontWeight: 700, color: C.ink }}>{money(confirmingWithdrawal.balance)}</span></p>
                                 )}
                               </div>
                             </div>
                           </div>
                           {confirmingWithdrawal.destinationNumber && (
                             <div className="flex items-center justify-between text-xs" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
-                              <span style={{ color: C.muted }}>Non destinasyon:</span>
+                              <span style={{ color: C.muted }}>{tt("Non destinasyon:")}</span>
                               {namesMatch(confirmingWithdrawal.user, confirmingWithdrawal.destinationName) ? (
                                 <span className="font-bold flex items-center gap-1" style={{ color: '#2B5842' }}>
-                                  <Check size={13} /> {confirmingWithdrawal.destinationName} — Korespondan
+                                  <Check size={13} /> {confirmingWithdrawal.destinationName} {tt("— Korespondan")}
                                 </span>
                               ) : (
                                 <span className="font-bold flex items-center gap-1" style={{ color: '#8E341F' }}>
-                                  ⚠ {confirmingWithdrawal.destinationName} — Diferan
+                                  ⚠ {confirmingWithdrawal.destinationName} {tt("— Diferan")}
                                 </span>
                               )}
                             </div>
                           )}
                           {confirmingWithdrawal.method === 'biwo' && (
                             <div className="text-xs" style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}`, color: C.navy }}>
-                              {confirmingWithdrawal.branch} · Kòd kliyan: <span style={{ ...fontMono, fontWeight: 700 }}>{confirmingWithdrawal.clientId}</span>
+                              {confirmingWithdrawal.branch} {tt("· Kòd kliyan:")} <span style={{ ...fontMono, fontWeight: 700 }}>{confirmingWithdrawal.clientId}</span>
                             </div>
                           )}
                         </div>
 
                         <div className="text-xs" style={{ marginTop: 14 }}>
                           <div className="flex justify-between" style={{ padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
-                            <span style={{ color: C.muted }}>Montan mande:</span>
+                            <span style={{ color: C.muted }}>{tt("Montan mande:")}</span>
                             <span style={{ ...fontMono, fontWeight: 700, color: C.ink }}>{money(confirmingWithdrawal.amount)}</span>
                           </div>
                           <div className="flex justify-between" style={{ padding: '7px 0', borderBottom: `1px solid ${C.border}` }}>
-                            <span style={{ color: C.muted }}>Frè:</span>
+                            <span style={{ color: C.muted }}>{tt("Frè:")}</span>
                             <span style={{ ...fontMono, color: C.danger }}>−{money(confirmingWithdrawal.fee || 0)}</span>
                           </div>
                           <div className="flex justify-between items-baseline rounded-md" style={{ padding: '8px 10px', background: C.bg, marginTop: 4 }}>
-                            <span className="text-xs font-bold uppercase" style={{ color: C.navy }}>Nèt pou debouse:</span>
+                            <span className="text-xs font-bold uppercase" style={{ color: C.navy }}>{tt("Nèt pou debouse:")}</span>
                             <span style={{ ...fontMono, fontWeight: 800, fontSize: 16, color: '#2B5842' }}>{money(confirmingWithdrawal.amount)}</span>
                           </div>
                         </div>
 
                         <div style={{ marginTop: 14 }}>
-                          <label className="text-xs font-bold uppercase" style={{ color: C.danger }}>Prèv ou voye lajan an (OBLIGATWA)</label>
+                          <label className="text-xs font-bold uppercase" style={{ color: C.danger }}>{tt("Prèv ou voye lajan an (OBLIGATWA)")}</label>
                           <input type="file" accept="image/*" onChange={(e) => setWithdrawalProofFile(e.target.files?.[0] || null)}
                             className="w-full mt-1.5 text-xs" />
                           {withdrawalProofFile && (
@@ -1987,12 +2023,12 @@ export default function BlicPayAdmin() {
                             disabled={confirmingWithdrawalBusy || !proofOk}
                             className="bp-btn w-full py-3 rounded-lg text-sm font-bold text-white"
                             style={{ background: C.navy, opacity: (confirmingWithdrawalBusy || !proofOk) ? 0.5 : 1 }}>
-                            {confirmingWithdrawalBusy ? 'Ap konfime...' : `Apwouve & Debouse (${money(confirmingWithdrawal.amount)})`}
+                            {confirmingWithdrawalBusy ? tt("Ap konfime...") : tt("Apwouve & Debouse ({0})", money(confirmingWithdrawal.amount))}
                           </button>
                           <button
                             onClick={() => { rejectWithdrawal(confirmingWithdrawal.id); setConfirmingWithdrawal(null); }}
                             className="bp-btn w-full py-2 rounded-lg text-xs font-bold" style={{ background: '#FBEBE6', color: C.danger, border: '1px solid rgba(181,72,46,0.25)' }}>
-                            Rejte demand lan
+                            {tt("Rejte demand lan")}
                           </button>
                         </div>
                       </div>
@@ -2006,9 +2042,9 @@ export default function BlicPayAdmin() {
               {withdrawalView === 'history' && (
                 <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                   {loadingWithdrawalHistory ? (
-                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Ap chaje...</p>
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Ap chaje...")}</p>
                   ) : withdrawalHistory.length === 0 ? (
-                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen istorik toujou.</p>
+                    <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Pa gen istorik toujou.")}</p>
                   ) : withdrawalHistory.map((w, i) => {
                     const M = methodIcons[w.method] || { icon: DollarSign, color: C.muted, label: w.method };
                     return (
@@ -2020,7 +2056,7 @@ export default function BlicPayAdmin() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{w.user}</p>
-                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{M.label} · {w.date}{w.branch ? ` · 📍 ${w.branch}` : ''}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt(M.label)} · {w.date}{w.branch ? ` · 📍 ${w.branch}` : ''}</p>
                             {w.destinationNumber && (
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <p className="text-xs" style={{ ...fontMono, color: C.muted }}>→ {w.destinationNumber} ({w.destinationName})</p>
@@ -2032,7 +2068,7 @@ export default function BlicPayAdmin() {
                         <div className="flex items-center gap-3">
                           <span style={{ ...fontMono, color: C.danger }} className="text-sm font-semibold">−{money(w.amount)}</span>
                           <Badge tone={w.status === 'confirmed' ? 'mint' : w.status === 'rejected' ? 'danger' : 'amber'}>
-                            {w.status === 'confirmed' ? 'Konfime' : w.status === 'rejected' ? 'Refize' : 'Ap tann'}
+                            {w.status === 'confirmed' ? tt("Konfime") : w.status === 'rejected' ? tt("Refize") : tt("Ap tann")}
                           </Badge>
                         </div>
                       </div>
@@ -2045,17 +2081,17 @@ export default function BlicPayAdmin() {
 
           {nav === 'goals' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Depo Objektif</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Apèsi objektif epay kliyan yo — pa bezwen apwobasyon.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Depo Objektif")}</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Apèsi objektif epay kliyan yo — pa bezwen apwobasyon.")}</p>
 
               <div className="mt-6">
                 <Table>
                   <thead style={{ background: C.bg }}>
-                    <tr><Th>Kliyan</Th><Th>Objektif</Th><Th>Pwogrè</Th><Th align="right">Ekonomize</Th><Th align="right">Sib</Th></tr>
+                    <tr><Th>{tt("Kliyan")}</Th><Th>{tt("Objektif")}</Th><Th>{tt("Pwogrè")}</Th><Th align="right">{tt("Ekonomize")}</Th><Th align="right">{tt("Sib")}</Th></tr>
                   </thead>
                   <tbody>
-                    {loadingGoals ? <EmptyRow colSpan={5}>Ap chaje...</EmptyRow>
-                      : goals.length === 0 ? <EmptyRow colSpan={5}>Pa gen objektif.</EmptyRow>
+                    {loadingGoals ? <EmptyRow colSpan={5}>{tt("Ap chaje...")}</EmptyRow>
+                      : goals.length === 0 ? <EmptyRow colSpan={5}>{tt("Pa gen objektif.")}</EmptyRow>
                       : goals.map((g) => {
                         const pct = Math.min(100, Math.round((g.saved / g.target) * 100));
                         return (
@@ -2069,7 +2105,7 @@ export default function BlicPayAdmin() {
                                 </div>
                               </div>
                             </Td>
-                            <Td><span className="font-medium">{g.title}</span> {g.status === 'completed' && <Badge tone="mint">Atenn</Badge>}{g.status === 'withdrawn' && <Badge tone="muted">Retire</Badge>}</Td>
+                            <Td><span className="font-medium">{g.title}</span> {g.status === 'completed' && <Badge tone="mint">{tt("Atenn")}</Badge>}{g.status === 'withdrawn' && <Badge tone="muted">{tt("Retire")}</Badge>}</Td>
                             <Td>
                               <div className="flex items-center gap-2" style={{ minWidth: 130 }}>
                                 <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: C.bg }}>
@@ -2091,22 +2127,22 @@ export default function BlicPayAdmin() {
 
           {nav === 'loans' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Prè</h1>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Prè")}</h1>
               <p className="text-sm mt-1" style={{ color: C.muted }}>
-                {admin?.role === 'agent' ? 'Gade estati ak dat echeans prè kliyan yo.' : 'Apwouve oswa refize demand prè, swiv vèsman yo.'}
+                {admin?.role === 'agent' ? tt("Gade estati ak dat echeans prè kliyan yo.") : tt("Apwouve oswa refize demand prè, swiv vèsman yo.")}
               </p>
 
               <div className="mt-6">
                 <Table>
                   <thead style={{ background: C.bg }}>
                     <tr>
-                      <Th>Kliyan</Th><Th align="right">Montan</Th><Th>Plan</Th><Th>Vèsman</Th><Th>Pwochen echeans</Th><Th align="center">Estati</Th>
-                      {admin?.role !== 'agent' && <Th align="right">Aksyon</Th>}
+                      <Th>{tt("Kliyan")}</Th><Th align="right">{tt("Montan")}</Th><Th>{tt("Plan")}</Th><Th>{tt("Vèsman")}</Th><Th>{tt("Pwochen echeans")}</Th><Th align="center">{tt("Estati")}</Th>
+                      {admin?.role !== 'agent' && <Th align="right">{tt("Aksyon")}</Th>}
                     </tr>
                   </thead>
                   <tbody>
-                    {loadingLoans ? <EmptyRow colSpan={7}>Ap chaje...</EmptyRow>
-                      : loans.length === 0 ? <EmptyRow colSpan={7}>Pa gen prè.</EmptyRow>
+                    {loadingLoans ? <EmptyRow colSpan={7}>{tt("Ap chaje...")}</EmptyRow>
+                      : loans.length === 0 ? <EmptyRow colSpan={7}>{tt("Pa gen prè.")}</EmptyRow>
                       : loans.map((l) => {
                         const paidCount = (l.installments || []).filter((i) => i.status === 'paid').length;
                         const nextInstallment = (l.installments || []).find((i) => i.status !== 'paid');
@@ -2123,20 +2159,20 @@ export default function BlicPayAdmin() {
                               </div>
                             </Td>
                             <Td align="right"><span className="font-semibold">{money(l.amount)}</span></Td>
-                            <Td>{l.months} mwa · {(l.rate * 100).toFixed(0)}%</Td>
-                            <Td>{l.status === 'pending' ? '—' : `${paidCount}/${l.installments.length} peye`}</Td>
+                            <Td>{l.months} {tt("mwa ·")} {(l.rate * 100).toFixed(0)}%</Td>
+                            <Td>{l.status === 'pending' ? '—' : tt("{0}/{1} peye", paidCount, l.installments.length)}</Td>
                             <Td>{nextDue || '—'}</Td>
                             <Td align="center">
                               <Badge tone={l.status === 'pending' ? 'amber' : l.status === 'active' ? 'navy' : l.status === 'rejected' ? 'danger' : 'mint'}>
-                                {l.status === 'pending' ? 'Ap tann' : l.status === 'active' ? 'Aktif' : l.status === 'rejected' ? 'Refize' : 'Peye'}
+                                {l.status === 'pending' ? tt("Ap tann") : l.status === 'active' ? tt("Aktif") : l.status === 'rejected' ? tt("Refize") : tt("Peye")}
                               </Badge>
                             </Td>
                             {admin?.role !== 'agent' && (
                               <Td align="right">
                                 {l.status === 'pending' && (
                                   <div className="flex items-center gap-2 justify-end">
-                                    <button onClick={() => rejectLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>Refize</button>
-                                    <button onClick={() => approveLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: C.mint }}>Apwouve</button>
+                                    <button onClick={() => rejectLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>{tt("Refize@@btn")}</button>
+                                    <button onClick={() => approveLoan(l.id)} className="bp-btn px-3 py-1.5 rounded-lg text-xs font-semibold text-white" style={{ background: C.mint }}>{tt("Apwouve")}</button>
                                   </div>
                                 )}
                               </Td>
@@ -2152,17 +2188,17 @@ export default function BlicPayAdmin() {
 
           {nav === 'transfers' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Transfè</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Istorik transfè ant kliyan yo — fèt otomatikman, pa bezwen apwobasyon.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Transfè")}</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Istorik transfè ant kliyan yo — fèt otomatikman, pa bezwen apwobasyon.")}</p>
 
               <div className="mt-6">
                 <Table>
                   <thead style={{ background: C.bg }}>
-                    <tr><Th>Soti</Th><Th>Rive</Th><Th align="right">Montan</Th><Th align="right">Dat</Th></tr>
+                    <tr><Th>{tt("Soti")}</Th><Th>{tt("Rive")}</Th><Th align="right">{tt("Montan")}</Th><Th align="right">{tt("Dat")}</Th></tr>
                   </thead>
                   <tbody>
-                    {loadingTransfers ? <EmptyRow colSpan={4}>Ap chaje...</EmptyRow>
-                      : transfers.length === 0 ? <EmptyRow colSpan={4}>Pa gen transfè.</EmptyRow>
+                    {loadingTransfers ? <EmptyRow colSpan={4}>{tt("Ap chaje...")}</EmptyRow>
+                      : transfers.length === 0 ? <EmptyRow colSpan={4}>{tt("Pa gen transfè.")}</EmptyRow>
                       : transfers.map((t) => (
                         <tr key={t.id}>
                           <Td><span className="font-medium">{t.fromUser.fullName}</span></Td>
@@ -2179,21 +2215,21 @@ export default function BlicPayAdmin() {
 
           {nav === 'sol' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>BLIC Sòl</h1>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("BLIC Sòl")}</h1>
               <p className="text-sm mt-1" style={{ color: C.muted }}>
-                {admin?.role === 'agent' ? 'Gade enfòmasyon gwoup yo pou reponn kesyon kliyan lokal ou yo.' : 'Apwouve demand adezyon, swiv kapasite chak gwoup.'}
+                {admin?.role === 'agent' ? tt("Gade enfòmasyon gwoup yo pou reponn kesyon kliyan lokal ou yo.") : tt("Apwouve demand adezyon, swiv kapasite chak gwoup.")}
               </p>
 
               {admin?.role !== 'agent' && (
               <>
               <div className="mt-6 flex items-center justify-between">
-                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>DEMAND K'AP TANN APWOBASYON</h3>
+                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>{tt("DEMAND K'AP TANN APWOBASYON")}</h3>
               </div>
               <div className="mt-3 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                 {loadingSol ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
                 ) : solRequests.length === 0 ? (
-                  <p className="text-sm p-5" style={{ color: C.muted, background: C.card }}>Pa gen demand k'ap tann.</p>
+                  <p className="text-sm p-5" style={{ color: C.muted, background: C.card }}>{tt("Pa gen demand k'ap tann.")}</p>
                 ) : solRequests.map((r, i) => (
                   <div key={r.id} className="px-5 py-4"
                     style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
@@ -2217,14 +2253,14 @@ export default function BlicPayAdmin() {
                             <X size={15} color={C.danger} />
                           </button>
                           <button onClick={() => setApprovingSolId(approvingSolId === r.id ? null : r.id)} className="bp-btn px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5" style={{ background: C.mint, color: '#fff' }}>
-                            <Check size={13} /> Apwouve
+                            <Check size={13} /> {tt("Apwouve")}
                           </button>
                         </div>
                       </div>
                     </div>
                     {approvingSolId === r.id && (
                       <div className="mt-3 p-3 rounded-xl flex items-center gap-2 flex-wrap" style={{ background: C.bg }}>
-                        <span className="text-xs font-semibold" style={{ color: C.muted }}>Chwazi pozisyon (6 a 10):</span>
+                        <span className="text-xs font-semibold" style={{ color: C.muted }}>{tt("Chwazi pozisyon (6 a 10):")}</span>
                         {Array.from({ length: 5 }, (_, idx) => idx + 6).map((pos) => {
                           const count = r.positionCounts?.[pos] || 0;
                           const taken = count >= 2;
@@ -2248,14 +2284,14 @@ export default function BlicPayAdmin() {
               )}
 
               <div className="mt-8 flex items-center justify-between flex-wrap gap-3">
-                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>TOUT GWOUP YO ({solGroups.length})</h3>
+                <h3 className="font-semibold text-sm" style={{ color: C.muted }}>{tt("TOUT GWOUP YO (")}{solGroups.length})</h3>
                 <div className="flex items-center gap-4 flex-wrap">
                   <div className="flex items-center gap-1.5">
                     {[
-                      { id: 'all', label: 'Tout' },
-                      { id: 'semenn', label: 'Chak semenn' },
-                      { id: 'kenzenn', label: 'Chak 15 jou' },
-                      { id: 'mwa', label: 'Chak mwa' },
+                      { id: 'all', label: tt("Tout") },
+                      { id: 'semenn', label: tt("Chak semenn") },
+                      { id: 'kenzenn', label: tt("Chak 15 jou") },
+                      { id: 'mwa', label: tt("Chak mwa") },
                     ].map((f) => (
                       <button key={f.id} onClick={() => setSolFreqFilter(f.id)}
                         className="bp-btn rounded-lg text-xs font-medium"
@@ -2270,7 +2306,7 @@ export default function BlicPayAdmin() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     {[
-                      { id: 'all', label: 'Tout nivo' },
+                      { id: 'all', label: tt("Tout nivo") },
                       { id: 'basic', label: 'Basic' },
                       { id: 'standard', label: 'Standard' },
                       { id: 'premium', label: 'Premium' },
@@ -2302,10 +2338,10 @@ export default function BlicPayAdmin() {
                       </div>
                       <p className="mt-1.5 text-xs" style={{ color: C.muted }}>{g.frequency} · {money(g.amount)}</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs" style={{ color: C.muted }}>Manm</span>
+                        <span className="text-xs" style={{ color: C.muted }}>{tt("Manm")}</span>
                         <Badge tone={isFull ? 'mint' : 'muted'}>{g.approvedCount}/{g.maxMembers}</Badge>
                       </div>
-                      {g.pendingCount > 0 && <p className="mt-1 text-xs" style={{ color: C.amber }}>{g.pendingCount} demand ap tann</p>}
+                      {g.pendingCount > 0 && <p className="mt-1 text-xs" style={{ color: C.amber }}>{g.pendingCount} {tt("demand ap tann")}</p>}
                     </button>
                   );
                 })}
@@ -2315,13 +2351,13 @@ export default function BlicPayAdmin() {
 
           {nav === 'solPayouts' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Pòch Sòl resevwa</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Istorik tout pòch Sòl ki reyèlman peye — chak fwa yon manm resevwa nan wotasyon an.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Pòch Sòl resevwa")}</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Istorik tout pòch Sòl ki reyèlman peye — chak fwa yon manm resevwa nan wotasyon an.")}</p>
               <div className="mt-6 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
                 {loadingSolPayouts ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Ap chaje...</p>
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Ap chaje...")}</p>
                 ) : solPayouts.length === 0 ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>Pa gen okenn pòch peye toujou.</p>
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted, background: C.card }}>{tt("Pa gen okenn pòch peye toujou.")}</p>
                 ) : solPayouts.map((p, i) => (
                   <div key={p.id} className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
                     style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
@@ -2336,7 +2372,7 @@ export default function BlicPayAdmin() {
                     </div>
                     <div className="text-right">
                       <span style={fontMono} className="text-sm font-semibold" >{money(p.amount)}</span>
-                      <p className="text-xs mt-0.5" style={{ color: C.muted }}>{p.group.name} · pozisyon #{p.period + 1}</p>
+                      <p className="text-xs mt-0.5" style={{ color: C.muted }}>{p.group.name} {tt("· pozisyon #")}{p.period + 1}</p>
                     </div>
                   </div>
                 ))}
@@ -2350,14 +2386,14 @@ export default function BlicPayAdmin() {
             <div className="fadein">
               {!selectedKyc ? (
                 <>
-                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Verifikasyon KYC</h1>
-                  <p className="text-sm mt-1" style={{ color: C.muted }}>{kycSubmissions.length} demand ap tann egzamen — analize pa Didit.</p>
+                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Verifikasyon KYC")}</h1>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>{kycSubmissions.length} {tt("demand ap tann egzamen — analize pa Didit.")}</p>
 
                   <div className="mt-6 flex flex-col gap-3">
                     {loadingKyc ? (
-                      <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                      <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
                     ) : kycSubmissions.length === 0 ? (
-                      <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen demand k'ap tann.</p>
+                      <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>{tt("Pa gen demand k'ap tann.")}</p>
                     ) : kycSubmissions.map((s) => (
                       <button key={s.id} onClick={() => openKyc(s)} className="bp-btn text-left p-4 rounded-xl flex items-center justify-between"
                         style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -2372,7 +2408,7 @@ export default function BlicPayAdmin() {
                         </div>
                         <div className="flex items-center gap-2">
                           {s.diditStatus && <Badge tone={s.diditStatus === 'Approved' ? 'mint' : s.diditStatus === 'Declined' ? 'danger' : 'navy'}>{s.diditStatus}</Badge>}
-                          <Badge tone="amber">Ap tann</Badge>
+                          <Badge tone="amber">{tt("Ap tann")}</Badge>
                         </div>
                       </button>
                     ))}
@@ -2381,7 +2417,7 @@ export default function BlicPayAdmin() {
               ) : (
                 <>
                   <button onClick={() => { setSelectedKyc(null); setKycDetail(null); }} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: C.muted }}>
-                    <ChevronLeft size={15} /> Retounen nan lis la
+                    <ChevronLeft size={15} /> {tt("Retounen nan lis la")}
                   </button>
 
                   <div className="p-5 rounded-2xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -2398,28 +2434,28 @@ export default function BlicPayAdmin() {
                       <div className="flex items-center gap-2">
                         {kycDetail?.diditStatus && (
                           <Badge tone={kycDetail.diditStatus === 'Approved' ? 'mint' : kycDetail.diditStatus === 'Declined' ? 'danger' : 'navy'}>
-                            Didit: {kycDetail.diditStatus}
+                            {tt("Didit:")} {kycDetail.diditStatus}
                           </Badge>
                         )}
                         <button onClick={refreshKycFromDidit} disabled={kycRefreshing}
                           className="bp-btn px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1"
                           style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}`, opacity: kycRefreshing ? 0.6 : 1 }}>
                           <RefreshCw size={12} className={kycRefreshing ? 'animate-spin' : ''} />
-                          {kycRefreshing ? 'Ap chèche...' : 'Rafrechi'}
+                          {kycRefreshing ? tt("Ap chèche...") : tt("Rafrechi")}
                         </button>
                       </div>
                     </div>
 
                     {!kycDetail ? (
-                      <p className="text-sm mt-4" style={{ color: C.muted }}>Ap chaje rapò a...</p>
+                      <p className="text-sm mt-4" style={{ color: C.muted }}>{tt("Ap chaje rapò a...")}</p>
                     ) : (
                       <>
                         <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
                           <ShieldCheck size={15} className="shrink-0 mt-0.5" />
-                          Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.
+                          {tt("Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.")}
                         </div>
 
-                        <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>Rezime chif ak eskò</p>
+                        <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>{tt("Rezime chif ak eskò")}</p>
                         {(() => {
                           let sections = [];
                           try {
@@ -2449,7 +2485,7 @@ export default function BlicPayAdmin() {
                           } catch {}
 
                           if (sections.length === 0) {
-                            return <p className="mt-1.5 text-xs" style={{ color: C.muted }}>Pa gen eskò disponib toujou.</p>;
+                            return <p className="mt-1.5 text-xs" style={{ color: C.muted }}>{tt("Pa gen eskò disponib toujou.")}</p>;
                           }
 
                           return (
@@ -2476,7 +2512,7 @@ export default function BlicPayAdmin() {
                           );
                         })()}
 
-                        <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>Foto Didit jwenn</p>
+                        <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>{tt("Foto Didit jwenn")}</p>
                         {(() => {
                           let images = [];
                           try {
@@ -2496,7 +2532,7 @@ export default function BlicPayAdmin() {
                             walk(parsed);
                           } catch {}
                           if (images.length === 0) {
-                            return <p className="mt-1.5 text-xs" style={{ color: C.muted }}>Pa gen foto disponib toujou nan rapò a.</p>;
+                            return <p className="mt-1.5 text-xs" style={{ color: C.muted }}>{tt("Pa gen foto disponib toujou nan rapò a.")}</p>;
                           }
                           return (
                             <div className="mt-1.5 grid grid-cols-2 gap-2.5">
@@ -2511,14 +2547,14 @@ export default function BlicPayAdmin() {
                           );
                         })()}
 
-                        <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>Rapò konplè Didit</p>
+                        <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>{tt("Rapò konplè Didit")}</p>
                         <pre className="mt-1.5 p-3 rounded-lg text-xs overflow-auto"
                           style={{ background: C.bg, border: `1px solid ${C.border}`, maxHeight: 360, fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                           {(() => {
                             try {
                               return JSON.stringify(JSON.parse(kycDetail.diditReport || '{}'), null, 2);
                             } catch {
-                              return kycDetail.diditReport || 'Pa gen rapò disponib toujou — tann webhook Didit la rive.';
+                              return kycDetail.diditReport || tt("Pa gen rapò disponib toujou — tann webhook Didit la rive.");
                             }
                           })()}
                         </pre>
@@ -2526,15 +2562,15 @@ export default function BlicPayAdmin() {
                     )}
 
                     <textarea value={kycRejectReason} onChange={(e) => setKycRejectReason(e.target.value)}
-                      placeholder="Rezon refi (obligatwa si ou refize)..."
+                      placeholder={tt("Rezon refi (obligatwa si ou refize)...")}
                       className="mt-4 w-full rounded-lg text-sm p-3" style={{ border: `1px solid ${C.border}`, minHeight: 60 }} />
 
                     <div className="mt-4 flex items-center gap-3">
                       <button onClick={() => decideKyc('reject')} className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>
-                        <X size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> Refize
+                        <X size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> {tt("Refize@@btn")}
                       </button>
                       <button onClick={() => decideKyc('approve')} className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint }}>
-                        <Check size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> Apwouve
+                        <Check size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> {tt("Apwouve")}
                       </button>
                     </div>
                   </div>
@@ -2547,14 +2583,14 @@ export default function BlicPayAdmin() {
             <div className="fadein">
               {!selectedVr ? (
                 <>
-                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Dokiman Siplemantè</h1>
-                  <p className="text-sm mt-1" style={{ color: C.muted }}>{vrPending.length} demand ap tann egzamen.</p>
+                  <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Dokiman Siplemantè")}</h1>
+                  <p className="text-sm mt-1" style={{ color: C.muted }}>{vrPending.length} {tt("demand ap tann egzamen.")}</p>
 
                   <div className="mt-6 flex flex-col gap-3">
                     {loadingVr ? (
-                      <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                      <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
                     ) : vrPending.length === 0 ? (
-                      <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen demand k'ap tann.</p>
+                      <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>{tt("Pa gen demand k'ap tann.")}</p>
                     ) : vrPending.map((r) => (
                       <button key={r.id} onClick={() => { setSelectedVr(r); setVrRejectReason(''); }} className="bp-btn text-left p-4 rounded-xl flex items-center justify-between"
                         style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -2575,7 +2611,7 @@ export default function BlicPayAdmin() {
               ) : (
                 <>
                   <button onClick={() => setSelectedVr(null)} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: C.muted }}>
-                    <ChevronLeft size={15} /> Retounen nan lis la
+                    <ChevronLeft size={15} /> {tt("Retounen nan lis la")}
                   </button>
 
                   <div className="p-5 rounded-2xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -2594,35 +2630,35 @@ export default function BlicPayAdmin() {
 
                     {selectedVr.note && (
                       <p className="mt-4 text-xs p-3 rounded-lg" style={{ background: C.bg, color: C.muted }}>
-                        Nòt admin: {selectedVr.note}
+                        {tt("Nòt admin:")} {selectedVr.note}
                       </p>
                     )}
 
-                    <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>Dokiman kliyan an voye</p>
+                    <p className="mt-4 text-sm font-semibold" style={{ color: C.muted }}>{tt("Dokiman kliyan an voye")}</p>
                     {selectedVr.fileData ? (
                       selectedVr.fileMimeType?.startsWith('image/') ? (
-                        <img src={`data:${selectedVr.fileMimeType};base64,${selectedVr.fileData}`} alt="Dokiman"
+                        <img src={`data:${selectedVr.fileMimeType};base64,${selectedVr.fileData}`} alt={tt("Dokiman")}
                           className="mt-1.5 w-full rounded-lg" style={{ border: `1px solid ${C.border}`, maxHeight: 420, objectFit: 'contain', background: C.bg }} />
                       ) : (
                         <a className="mt-1.5 inline-block text-sm font-semibold" style={{ color: C.navy }}
                           href={`data:${selectedVr.fileMimeType};base64,${selectedVr.fileData}`} download={`document-${selectedVr.id}`}>
-                          Telechaje dokiman an
+                          {tt("Telechaje dokiman an")}
                         </a>
                       )
                     ) : (
-                      <p className="mt-1.5 text-xs" style={{ color: C.muted }}>Pa gen fichye — kliyan an refè verifikasyon idantite li via Didit (gade nan seksyon KYC).</p>
+                      <p className="mt-1.5 text-xs" style={{ color: C.muted }}>{tt("Pa gen fichye — kliyan an refè verifikasyon idantite li via Didit (gade nan seksyon KYC).")}</p>
                     )}
 
                     <textarea value={vrRejectReason} onChange={(e) => setVrRejectReason(e.target.value)}
-                      placeholder="Rezon refi (obligatwa si ou refize)..."
+                      placeholder={tt("Rezon refi (obligatwa si ou refize)...")}
                       className="mt-4 w-full rounded-lg text-sm p-3" style={{ border: `1px solid ${C.border}`, minHeight: 60 }} />
 
                     <div className="mt-4 flex items-center gap-3">
                       <button onClick={() => decideVerificationRequest('reject')} className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.danger }}>
-                        <X size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> Refize
+                        <X size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> {tt("Refize@@btn")}
                       </button>
                       <button onClick={() => decideVerificationRequest('approve')} className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint }}>
-                        <Check size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> Apwouve
+                        <Check size={14} className="inline mr-1.5" style={{ verticalAlign: -2 }} /> {tt("Apwouve")}
                       </button>
                     </div>
                   </div>
@@ -2633,14 +2669,14 @@ export default function BlicPayAdmin() {
 
           {nav === 'support' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Mesaj Sipò</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>{supportMessages.length} mesaj kliyan ki poko rezoud.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Mesaj Sipò")}</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>{supportMessages.length} {tt("mesaj kliyan ki poko rezoud.")}</p>
 
               <div className="mt-6 flex flex-col gap-3">
                 {loadingSupport ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
                 ) : supportMessages.length === 0 ? (
-                  <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen mesaj k'ap tann.</p>
+                  <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>{tt("Pa gen mesaj k'ap tann.")}</p>
                 ) : supportMessages.map((m) => (
                   <div key={m.id} className="p-4 rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                     <div className="flex items-center justify-between">
@@ -2658,7 +2694,7 @@ export default function BlicPayAdmin() {
                     <p className="mt-3 text-sm" style={{ color: C.ink }}>{m.message}</p>
                     <button onClick={() => closeSupportMessage(m.id)}
                       className="bp-btn mt-3 text-xs font-semibold px-3 py-1.5 rounded-md" style={{ background: C.bg, color: C.mint, border: `1px solid ${C.border}` }}>
-                      <Check size={12} className="inline mr-1" style={{ verticalAlign: -1 }} /> Make rezoud
+                      <Check size={12} className="inline mr-1" style={{ verticalAlign: -1 }} /> {tt("Make rezoud")}
                     </button>
                   </div>
                 ))}
@@ -2668,37 +2704,37 @@ export default function BlicPayAdmin() {
 
           {nav === 'users' && (
             <div className="fadein">
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Itilizatè</h1>
-              <p className="text-sm mt-1" style={{ color: C.muted }}>Klike sou yon kliyan pou wè detay ak istorik li.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Itilizatè")}</h1>
+              <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Klike sou yon kliyan pou wè detay ak istorik li.")}</p>
 
               <div className="mt-4 relative" style={{ maxWidth: 320 }}>
                 <Search size={14} color={C.muted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
-                <input value={query} onChange={(e) => { setQuery(e.target.value); loadUsers(token, e.target.value); }} placeholder="Chèche non oswa telefòn"
+                <input value={query} onChange={(e) => { setQuery(e.target.value); loadUsers(token, e.target.value); }} placeholder={tt("Chèche non oswa telefòn")}
                   className="pl-8 pr-3 py-2 rounded-lg text-sm w-full" style={{ background: C.card, border: `1px solid ${C.border}` }} />
               </div>
 
               <div className="mt-4">
                 <Table>
                   <thead style={{ background: C.bg }}>
-                    <tr><Th>Non</Th><Th>Telefòn</Th><Th>ID</Th><Th align="right">Balans</Th><Th align="center">Verifye</Th><Th align="center">Estati</Th></tr>
+                    <tr><Th>{tt("Non")}</Th><Th>{tt("Telefòn")}</Th><Th>ID</Th><Th align="right">{tt("Balans")}</Th><Th align="center">{tt("Verifye")}</Th><Th align="center">{tt("Estati")}</Th></tr>
                   </thead>
                   <tbody>
-                    {loadingUsers ? <EmptyRow colSpan={6}>Ap chaje...</EmptyRow>
-                      : users.length === 0 ? <EmptyRow colSpan={6}>Pa gen rezilta.</EmptyRow>
+                    {loadingUsers ? <EmptyRow colSpan={6}>{tt("Ap chaje...")}</EmptyRow>
+                      : users.length === 0 ? <EmptyRow colSpan={6}>{tt("Pa gen rezilta.")}</EmptyRow>
                       : users.map((u) => (
                         <tr key={u.id} onClick={() => openUser(u)} style={{ cursor: 'pointer' }}>
                           <Td>
                             <div className="flex items-center gap-2">
                               <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: u.role === 'admin' ? '#F4EBFF' : C.bg, color: u.role === 'admin' ? C.purple : C.navy }}>{initials(u.fullName)}</div>
                               <span className="font-medium">{u.fullName}</span>
-                              {u.role === 'admin' && <Badge tone="premium">Admin</Badge>}
+                              {u.role === 'admin' && <Badge tone="premium">{tt("Admin")}</Badge>}
                             </div>
                           </Td>
                           <Td>{u.phone}</Td>
                           <Td><span style={fontMono} className="text-xs">{u.clientId || '—'}</span></Td>
                           <Td align="right"><span className="font-semibold">{money(u.balance)}</span></Td>
-                          <Td align="center"><Badge tone={u.verified ? 'mint' : 'amber'}>{u.verified ? 'Wi' : 'Non'}</Badge></Td>
-                          <Td align="center"><Badge tone={u.blocked ? 'danger' : 'mint'}>{u.blocked ? 'Bloke' : 'Aktif'}</Badge></Td>
+                          <Td align="center"><Badge tone={u.verified ? 'mint' : 'amber'}>{u.verified ? tt("Wi") : tt("Non")}</Badge></Td>
+                          <Td align="center"><Badge tone={u.blocked ? 'danger' : 'mint'}>{u.blocked ? tt("Bloke") : tt("Aktif")}</Badge></Td>
                         </tr>
                       ))}
                   </tbody>
@@ -2716,19 +2752,19 @@ export default function BlicPayAdmin() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-bold">{selectedSolGroup.name}</p>
-                <p className="text-xs" style={{ color: C.muted }}>{selectedSolGroup.frequency} · {money(selectedSolGroup.amount)} pa moun</p>
+                <p className="text-xs" style={{ color: C.muted }}>{selectedSolGroup.frequency} · {money(selectedSolGroup.amount)} {tt("pa moun")}</p>
               </div>
               <button onClick={() => setSelectedSolGroup(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
                 <X size={14} color={C.muted} />
               </button>
             </div>
 
-            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>Wotasyon ak dat peman</p>
+            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>{tt("Wotasyon ak dat peman")}</p>
             <div className="mt-2 flex flex-col gap-2">
               {!solGroupMembers ? (
-                <p className="text-xs" style={{ color: C.muted }}>Ap chaje...</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
               ) : solGroupMembers.length === 0 ? (
-                <p className="text-xs" style={{ color: C.muted }}>Pa gen manm apwouve poko.</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Pa gen manm apwouve poko.")}</p>
               ) : solGroupMembers.map((m) => (
                 <div key={m.id} className="flex items-center justify-between p-3 rounded-xl" style={{ border: `1px solid ${C.border}` }}>
                   <div className="flex items-center gap-2.5">
@@ -2741,13 +2777,13 @@ export default function BlicPayAdmin() {
                   <div className="text-right">
                     <p className="text-xs font-bold" style={{ color: C.navy }}>{m.payoutDate}</p>
                     {admin?.role === 'agent' ? (
-                      <p className="mt-1 text-xs" style={{ color: C.muted }}>pozisyon #{m.turnIndex + 1}</p>
+                      <p className="mt-1 text-xs" style={{ color: C.muted }}>{tt("pozisyon #")}{m.turnIndex + 1}</p>
                     ) : (
                       <select value={m.turnIndex + 1}
                         onChange={(e) => reassignSolPosition(selectedSolGroup.id, m.id, Number(e.target.value))}
                         className="mt-1 text-xs rounded-md px-1.5 py-0.5" style={{ border: `1px solid ${C.border}`, color: C.muted }}>
                         {Array.from({ length: selectedSolGroup.maxMembers }, (_, idx) => idx + 1).map((pos) => (
-                          <option key={pos} value={pos}>pozisyon #{pos}</option>
+                          <option key={pos} value={pos}>{tt("pozisyon #")}{pos}</option>
                         ))}
                       </select>
                     )}
@@ -2780,83 +2816,83 @@ export default function BlicPayAdmin() {
             </div>
 
             <div className="mt-4 p-4 rounded-xl" style={{ background: C.navy }}>
-              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>BALANS AKTYÈL</p>
+              <p className="text-xs" style={{ color: 'rgba(255,255,255,0.75)' }}>{tt("BALANS AKTYÈL")}</p>
               <p style={{ ...fontDisplay, fontSize: 22, fontWeight: 800, color: '#fff' }}>{money(selectedUser.balance)}</p>
             </div>
 
             <div className="mt-4 flex items-center gap-2">
               <button onClick={() => toggleBlock(selectedUser)} className="bp-btn flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
                 style={{ border: `1px solid ${C.border}`, color: selectedUser.blocked ? C.mint : C.danger }}>
-                <Lock size={12} /> {selectedUser.blocked ? 'Debloke kont' : 'Bloke kont'}
+                <Lock size={12} /> {selectedUser.blocked ? tt("Debloke kont") : tt("Bloke kont")}
               </button>
               <button onClick={() => toggleVerify(selectedUser)} className="bp-btn flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
                 style={{ border: `1px solid ${C.border}`, color: selectedUser.verified ? C.amber : C.mint }}>
-                <BadgeCheck size={12} /> {selectedUser.verified ? 'Retire verifikasyon' : 'Verifye'}
+                <BadgeCheck size={12} /> {selectedUser.verified ? tt("Retire verifikasyon") : tt("Verifye@@verb")}
               </button>
             </div>
 
-            <p className="mt-5 text-sm font-semibold" style={{ color: C.muted }}>Ajisteman manyèl balans</p>
+            <p className="mt-5 text-sm font-semibold" style={{ color: C.muted }}>{tt("Ajisteman manyèl balans")}</p>
             <div className="mt-2 flex items-center gap-2">
-              <input value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} placeholder="+/- montan" type="number"
+              <input value={adjustAmount} onChange={(e) => setAdjustAmount(e.target.value)} placeholder={tt("+/- montan")} type="number"
                 className="flex-1 px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
-              <button onClick={submitBalanceAdjust} className="bp-btn px-3 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: C.navy }}>Ajiste</button>
+              <button onClick={submitBalanceAdjust} className="bp-btn px-3 py-2 rounded-lg text-xs font-semibold text-white" style={{ background: C.navy }}>{tt("Ajiste")}</button>
             </div>
-            <input value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} placeholder="Rezon (obligatwa)"
+            <input value={adjustReason} onChange={(e) => setAdjustReason(e.target.value)} placeholder={tt("Rezon (obligatwa)")}
               className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
 
-            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>Dokiman siplemantè</p>
+            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>{tt("Dokiman siplemantè")}</p>
             <div className="mt-2 flex items-center gap-2">
               <select value={newVrType} onChange={(e) => setNewVrType(e.target.value)}
                 className="px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }}>
-                <option value="address_proof">Prèv adrès</option>
-                <option value="income_proof">Prèv revni</option>
-                <option value="identity_reverify">Refè verifikasyon idantite</option>
-                <option value="other">Lòt dokiman</option>
+                <option value="address_proof">{tt("Prèv adrès")}</option>
+                <option value="income_proof">{tt("Prèv revni")}</option>
+                <option value="identity_reverify">{tt("Refè verifikasyon idantite")}</option>
+                <option value="other">{tt("Lòt dokiman")}</option>
               </select>
               <button onClick={createVerificationRequest} disabled={creatingVr}
                 className="bp-btn px-3 py-2 rounded-lg text-xs font-semibold text-white shrink-0" style={{ background: C.navy, opacity: creatingVr ? 0.6 : 1 }}>
-                Mande
+                {tt("Mande")}
               </button>
             </div>
-            <input value={newVrNote} onChange={(e) => setNewVrNote(e.target.value)} placeholder="Nòt pou kliyan an (opsyonèl)"
+            <input value={newVrNote} onChange={(e) => setNewVrNote(e.target.value)} placeholder={tt("Nòt pou kliyan an (opsyonèl)")}
               className="mt-2 w-full px-3 py-2 rounded-lg text-sm" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
 
             <div className="mt-3 flex flex-col gap-2">
               {userVrRequests === null ? (
-                <p className="text-xs" style={{ color: C.muted }}>Ap chaje...</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
               ) : userVrRequests.length === 0 ? (
-                <p className="text-xs" style={{ color: C.muted }}>Pa gen demand dokiman siplemantè pou kliyan sa a.</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Pa gen demand dokiman siplemantè pou kliyan sa a.")}</p>
               ) : userVrRequests.map((r) => (
                 <div key={r.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ border: `1px solid ${C.border}` }}>
                   <div>
                     <p className="text-xs font-semibold">{VR_TYPE_LABELS[r.type] || r.type}</p>
-                    <p className="text-xs" style={{ color: C.muted }}>{new Date(r.requestedAt).toLocaleDateString('fr-FR')}</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{new Date(r.requestedAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')}</p>
                   </div>
                   {r.status === 'submitted' ? (
                     <button onClick={() => { setSelectedVr(r); setVrRejectReason(''); setNav('verificationRequests'); }}
                       className="bp-btn text-xs font-semibold px-2.5 py-1.5 rounded-md" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}` }}>
-                      Egzamine
+                      {tt("Egzamine")}
                     </button>
                   ) : (
                     <Badge tone={r.status === 'approved' ? 'mint' : r.status === 'rejected' ? 'danger' : 'amber'}>
-                      {r.status === 'approved' ? 'Apwouve' : r.status === 'rejected' ? 'Refize' : 'Ap tann kliyan'}
+                      {r.status === 'approved' ? tt("Apwouve@@status") : r.status === 'rejected' ? tt("Refize") : tt("Ap tann kliyan")}
                     </Badge>
                   )}
                 </div>
               ))}
             </div>
 
-            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>Istorik Depo</p>
+            <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>{tt("Istorik Depo")}</p>
             <div className="mt-2 flex flex-col gap-2">
               {!userDetail ? (
-                <p className="text-xs" style={{ color: C.muted }}>Ap chaje...</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Ap chaje...")}</p>
               ) : userDetail.deposits.length === 0 ? (
-                <p className="text-xs" style={{ color: C.muted }}>Pa gen depo.</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Pa gen depo.")}</p>
               ) : userDetail.deposits.map((d) => (
                 <div key={d.id} className="flex items-center justify-between p-2.5 rounded-lg" style={{ border: `1px solid ${C.border}` }}>
                   <div>
                     <p className="text-xs font-semibold">{methodIcons[d.method]?.label || d.method}</p>
-                    <p className="text-xs" style={{ color: C.muted }}>{new Date(d.createdAt).toLocaleDateString('fr-FR')}</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{new Date(d.createdAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold">{money(d.amount)}</p>
@@ -2868,7 +2904,7 @@ export default function BlicPayAdmin() {
 
             {userDetail && userDetail.solMemberships.length > 0 && (
               <>
-                <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>BLIC Sòl</p>
+                <p className="mt-6 text-sm font-semibold" style={{ color: C.muted }}>{tt("BLIC Sòl")}</p>
                 <div className="mt-2 flex flex-col gap-3">
                   {userDetail.solMemberships.map((m) => (
                     <div key={m.id} className="p-3 rounded-lg" style={{ border: `1px solid ${C.border}` }}>
@@ -2878,11 +2914,11 @@ export default function BlicPayAdmin() {
                       </div>
 
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs" style={{ color: C.muted }}>Dokiman Sòl la</span>
+                        <span className="text-xs" style={{ color: C.muted }}>{tt("Dokiman Sòl la")}</span>
                         <button onClick={() => toggleSolFormApproved(m.id, !m.formApproved)}
                           className="bp-btn px-2.5 py-1 rounded-md text-xs font-semibold"
                           style={{ background: m.formApproved ? '#E9F0EA' : '#F3E8D2', color: m.formApproved ? C.mint : '#8A6423' }}>
-                          {m.formApproved ? 'Konfime ✓' : 'Make konfime'}
+                          {m.formApproved ? tt("Konfime ✓") : tt("Make konfime")}
                         </button>
                       </div>
 
@@ -2891,7 +2927,7 @@ export default function BlicPayAdmin() {
                           {m.documents.map((doc) => (
                             <div key={doc.id} className="flex items-center justify-between text-xs px-2 py-1.5 rounded" style={{ background: C.bg }}>
                               <span>{doc.title}</span>
-                              <span style={{ color: C.muted }}>{new Date(doc.uploadedAt).toLocaleDateString('fr-FR')}</span>
+                              <span style={{ color: C.muted }}>{new Date(doc.uploadedAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')}</span>
                             </div>
                           ))}
                         </div>
@@ -2899,7 +2935,7 @@ export default function BlicPayAdmin() {
 
                       <div className="mt-2.5 flex flex-col gap-1.5">
                         <input value={solDocTitle} onChange={(e) => setSolDocTitle(e.target.value)}
-                          placeholder="Tit dokiman an (egzanp: Fiche d'informations)"
+                          placeholder={tt("Tit dokiman an (egzanp: Fiche d'informations)")}
                           className="px-2.5 py-1.5 rounded-md text-xs" style={{ background: C.bg, border: `1px solid ${C.border}` }} />
                         <input type="file" accept="image/*,application/pdf"
                           onChange={(e) => setSolDocFile(e.target.files?.[0] || null)}
@@ -2907,7 +2943,7 @@ export default function BlicPayAdmin() {
                         <button onClick={() => uploadSolDocument(m.id)} disabled={solDocUploadingFor === m.id}
                           className="bp-btn py-1.5 rounded-md text-xs font-semibold text-white"
                           style={{ background: C.navy, opacity: solDocUploadingFor === m.id ? 0.7 : 1 }}>
-                          {solDocUploadingFor === m.id ? 'Ap telechaje...' : 'Telechaje dokiman'}
+                          {solDocUploadingFor === m.id ? tt("Ap telechaje...") : tt("Telechaje dokiman")}
                         </button>
                       </div>
                     </div>
@@ -2921,22 +2957,22 @@ export default function BlicPayAdmin() {
 
       {nav === 'finance' && (
         <div className="fadein">
-          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Finans</h1>
+          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>{tt("Finans")}</h1>
           <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>
-            {admin?.role === 'agent' ? `Volim ou jenere nan siikisal ${admin?.branch || ''}.` : 'Vi jeneral sou volim ak revni BLICPay — detaye pa sous ak pa siikisal.'}
+            {admin?.role === 'agent' ? tt("Volim ou jenere nan siikisal {0}.", admin?.branch || '') : tt("Vi jeneral sou volim ak revni BLICPay — detaye pa sous ak pa siikisal.")}
           </p>
 
           {loadingFinance || !financeData ? (
-            <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
+            <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>{tt("Ap chaje...")}</p>
           ) : (
             <>
               <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 20 }}>
                 {[
-                  { id: 'day', label: 'Jodi a' },
-                  { id: 'week', label: 'Semèn nan' },
-                  { id: 'month', label: 'Mwa sa a' },
-                  { id: 'year', label: 'Ane sa a' },
-                  { id: 'all', label: 'Tout tan' },
+                  { id: 'day', label: tt("Jodi a") },
+                  { id: 'week', label: tt("Semèn nan") },
+                  { id: 'month', label: tt("Mwa sa a") },
+                  { id: 'year', label: tt("Ane sa a") },
+                  { id: 'all', label: tt("Tout tan") },
                 ].map((p) => (
                   <button key={p.id} onClick={() => { setFinancePeriod(p.id); loadFinance(p.id); }}
                     className="bp-btn rounded-lg text-sm font-medium"
@@ -2952,7 +2988,7 @@ export default function BlicPayAdmin() {
 
               {/* Rezèv manyèl pa metòd — MonCash/NatCash pa gen API balans, sipè admin mete l ajou alamen */}
               <div className="rounded-2xl" style={{ marginTop: 18, padding: '16px 18px', background: C.card, border: `1px solid ${C.border}` }}>
-                <p className="text-xs font-semibold" style={{ color: C.muted, marginBottom: 10 }}>REZÈV OPERASYONÈL (mete ajou alamen)</p>
+                <p className="text-xs font-semibold" style={{ color: C.muted, marginBottom: 10 }}>{tt("REZÈV OPERASYONÈL (mete ajou alamen)")}</p>
                 <div className="grid grid-cols-2" style={{ gap: 12 }}>
                   {['moncash', 'natcash'].map((methodId) => {
                     const reserve = reserves.find((r) => r.method === methodId);
@@ -2965,7 +3001,7 @@ export default function BlicPayAdmin() {
                             {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={14} color={M.color} />}
                           </div>
                           <div>
-                            <p className="text-xs font-semibold" style={{ color: C.muted }}>{M.label}</p>
+                            <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt(M.label)}</p>
                             {isEditing ? (
                               <input autoFocus value={reserveInput} onChange={(e) => setReserveInput(e.target.value)} type="number"
                                 className="mt-0.5 text-sm rounded-md" style={{ ...fontMono, width: 130, padding: '3px 6px', border: `1px solid ${C.border}` }} />
@@ -2987,7 +3023,7 @@ export default function BlicPayAdmin() {
                           ) : (
                             <button onClick={() => { setEditingReserveMethod(methodId); setReserveInput(String(reserve?.balance || 0)); }}
                               className="bp-btn text-xs font-semibold px-2.5 py-1.5 rounded-md" style={{ background: C.card, border: `1px solid ${C.border}`, color: C.navy }}>
-                              Modifye
+                              {tt("Modifye")}
                             </button>
                           )
                         )}
@@ -3005,7 +3041,7 @@ export default function BlicPayAdmin() {
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ position: 'relative', background: 'rgba(255,255,255,0.12)', marginBottom: 10 }}>
                     <TrendingUp size={16} color="#fff" />
                   </div>
-                  <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.7)' }}>Revni nèt total</p>
+                  <p className="text-xs" style={{ position: 'relative', color: 'rgba(255,255,255,0.7)' }}>{tt("Revni nèt total")}</p>
                   <p style={{ position: 'relative', ...fontDisplay, fontWeight: 800, fontSize: 20, color: '#fff', marginTop: 4 }}>{money(financeData.total)}</p>
                 </div>
                 )}
@@ -3013,14 +3049,14 @@ export default function BlicPayAdmin() {
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E6F0FB', marginBottom: 10 }}>
                     <Wallet size={16} color={C.navy} />
                   </div>
-                  <p className="text-xs" style={{ color: C.muted }}>Volim depo</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{tt("Volim depo")}</p>
                   <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.ink, marginTop: 4 }}>{money(financeData.totalDepositVolume)}</p>
                 </div>
                 <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#FBEEDF', marginBottom: 10 }}>
                     <ArrowDownLeft size={16} color={C.gold} />
                   </div>
-                  <p className="text-xs" style={{ color: C.muted }}>Volim retrè</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{tt("Volim retrè")}</p>
                   <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.ink, marginTop: 4 }}>{money(financeData.totalWithdrawalVolume)}</p>
                 </div>
                 {admin?.role !== 'agent' && (
@@ -3028,7 +3064,7 @@ export default function BlicPayAdmin() {
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F4EBFF', marginBottom: 10 }}>
                     <Users size={16} color={C.purple} />
                   </div>
-                  <p className="text-xs" style={{ color: C.muted }}>Volim Sòl aktif</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{tt("Volim Sòl aktif")}</p>
                   <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.gold, marginTop: 4 }}>
                     {money((financeData.solGroups || []).reduce((s, g) => s + g.potential, 0))}
                   </p>
@@ -3038,7 +3074,7 @@ export default function BlicPayAdmin() {
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E4F5EF', marginBottom: 10 }}>
                     <User size={16} color={C.mint} />
                   </div>
-                  <p className="text-xs" style={{ color: C.muted }}>Kliyan sèvi</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{tt("Kliyan sèvi")}</p>
                   <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.mint, marginTop: 4 }}>{financeData.totalUniqueClients || 0}</p>
                 </div>
               </div>
@@ -3047,10 +3083,10 @@ export default function BlicPayAdmin() {
               {admin?.role !== 'agent' && financeData.dailyVolume && financeData.dailyVolume.length > 0 && (
                 <div className="rounded-2xl" style={{ marginTop: 20, padding: '18px 20px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="flex items-center justify-between flex-wrap gap-2" style={{ marginBottom: 14 }}>
-                    <p className="text-sm font-semibold" style={{ color: C.ink }}>Volim jou pa jou</p>
+                    <p className="text-sm font-semibold" style={{ color: C.ink }}>{tt("Volim jou pa jou")}</p>
                     <div className="flex items-center gap-3 text-xs" style={{ color: C.muted }}>
-                      <span><span style={{ display: 'inline-block', width: 9, height: 9, background: C.navy, borderRadius: 2, marginRight: 5 }} />Depo</span>
-                      <span><span style={{ display: 'inline-block', width: 9, height: 9, background: C.gold, borderRadius: 2, marginRight: 5 }} />Retrè</span>
+                      <span><span style={{ display: 'inline-block', width: 9, height: 9, background: C.navy, borderRadius: 2, marginRight: 5 }} />{tt("Depo")}</span>
+                      <span><span style={{ display: 'inline-block', width: 9, height: 9, background: C.gold, borderRadius: 2, marginRight: 5 }} />{tt("Retrè")}</span>
                     </div>
                   </div>
                   {(() => {
@@ -3063,7 +3099,7 @@ export default function BlicPayAdmin() {
                               <div style={{ width: 9, height: Math.round((d.deposits / maxVal) * 100), background: C.navy, borderRadius: '2px 2px 0 0' }} />
                               <div style={{ width: 9, height: Math.round((d.withdrawals / maxVal) * 100), background: C.gold, borderRadius: '2px 2px 0 0' }} />
                             </div>
-                            <span style={{ fontSize: 9, color: C.muted }}>{new Date(d.date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>
+                            <span style={{ fontSize: 9, color: C.muted }}>{new Date(d.date).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: '2-digit' })}</span>
                           </div>
                         ))}
                       </div>
@@ -3075,42 +3111,42 @@ export default function BlicPayAdmin() {
               {admin?.role !== 'agent' && (
               <>
               {/* Pwodwi 100% dijital — pa gen siikisal ki enplike */}
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Pwodwi dijital (tout kliyan, san siikisal)</p>
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>{tt("Pwodwi dijital (tout kliyan, san siikisal)")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12 }}>
                 <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E6F0FB', marginBottom: 10 }}>
                     <Wallet size={16} color={C.navy} />
                   </div>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>BLIC Depo</p>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt("BLIC Depo")}</p>
                   <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.pockets.totalBalance)}</p>
-                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.pockets.activeCount} pòch aktif</p>
+                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.pockets.activeCount} {tt("pòch aktif")}</p>
                 </div>
                 <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E4F5EF', marginBottom: 10 }}>
                     <PiggyBank size={16} color={C.mint} />
                   </div>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>Depo ak objektif</p>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt("Depo ak objektif")}</p>
                   <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.goals.totalSaved)}</p>
-                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.goals.activeCount} aktif · {financeData.digitalProducts.goals.completedCount} rive</p>
+                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.goals.activeCount} {tt("aktif ·")} {financeData.digitalProducts.goals.completedCount} {tt("rive")}</p>
                 </div>
                 <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#FBEEDF', marginBottom: 10 }}>
                     <HandCoins size={16} color={C.gold} />
                   </div>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>Prè</p>
+                  <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt("Prè")}</p>
                   <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.loans.totalOutstanding)}</p>
-                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.loans.activeCount} prè aktif</p>
+                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.loans.activeCount} {tt("prè aktif")}</p>
                 </div>
               </div>
 
               {/* Volim pa gwoup Sòl */}
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Volim pa gwoup Sòl</p>
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>{tt("Volim pa gwoup Sòl")}</p>
               {(!financeData.solGroups || financeData.solGroups.length === 0) ? (
                 <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '32px 24px' }}>
                   <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
                     <Users size={18} color={C.muted} />
                   </div>
-                  <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn gwoup Sòl ak manm apwouve toujou.</p>
+                  <p className="text-sm" style={{ color: C.muted }}>{tt("Pa gen okenn gwoup Sòl ak manm apwouve toujou.")}</p>
                 </div>
               ) : (
                 <div className="flex flex-col" style={{ gap: 10 }}>
@@ -3121,7 +3157,7 @@ export default function BlicPayAdmin() {
                         <div className="flex items-center justify-between flex-wrap gap-2" style={{ marginBottom: 8 }}>
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold" style={{ color: C.ink }}>{g.name}</p>
-                            <Badge tone="muted">{g.memberCount}/{g.maxMembers} manm</Badge>
+                            <Badge tone="muted">{g.memberCount}/{g.maxMembers} {tt("manm")}</Badge>
                           </div>
                           <p className="text-xs font-semibold" style={{ ...fontMono, color: C.muted }}>{money(g.collected)} / {money(g.potential)}</p>
                         </div>
@@ -3135,12 +3171,12 @@ export default function BlicPayAdmin() {
               )}
 
               {/* Revni pa sous (egzistan deja) */}
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>Revni pa sous</p>
+              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>{tt("Revni pa sous")}</p>
               <div className="rounded-lg" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                 {[
-                  { label: 'Frè entegrasyon Sòl', sub: '1,5% sou pot total', value: financeData.breakdown.solIntegrationFees, accent: C.navy },
-                  { label: 'Penalite reta Sòl', sub: 'Kotizasyon an reta', value: financeData.breakdown.solPenalties, accent: '#8A6423' },
-                  { label: 'Frè retrè', sub: '1,25% sou lajan elektwonik', value: financeData.breakdown.withdrawalFees, accent: C.mint },
+                  { label: tt("Frè entegrasyon Sòl"), sub: tt("1,5% sou pot total"), value: financeData.breakdown.solIntegrationFees, accent: C.navy },
+                  { label: tt("Penalite reta Sòl"), sub: tt("Kotizasyon an reta"), value: financeData.breakdown.solPenalties, accent: '#8A6423' },
+                  { label: tt("Frè retrè"), sub: tt("1,25% sou lajan elektwonik"), value: financeData.breakdown.withdrawalFees, accent: C.mint },
                 ].map((row, i) => (
                   <div key={row.label} className="flex items-center justify-between" style={{ padding: '15px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                     <div className="flex items-center gap-3">
@@ -3159,14 +3195,14 @@ export default function BlicPayAdmin() {
 
               {/* Detay pa siikisal — kounye a ak kliyan sèvi */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>
-                {admin?.role === 'agent' ? `Detay siikisal ${admin?.branch || ''}` : 'Detay pa siikisal'}
+                {admin?.role === 'agent' ? tt("Detay siikisal {0}", admin?.branch || '') : tt("Detay pa siikisal")}
               </p>
               {Object.keys(financeData.byBranch || {}).length === 0 ? (
                 <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '32px 24px' }}>
                   <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
                     <Building2 size={18} color={C.muted} />
                   </div>
-                  <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn siikisal kreye toujou.</p>
+                  <p className="text-sm" style={{ color: C.muted }}>{tt("Pa gen okenn siikisal kreye toujou.")}</p>
                 </div>
               ) : (
                 <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
@@ -3181,7 +3217,7 @@ export default function BlicPayAdmin() {
                           </div>
                         )}
                         <p className="text-sm font-semibold" style={{ color: C.ink }}>{branch}</p>
-                        <Badge tone="muted">{stats.agentCount} ajan</Badge>
+                        <Badge tone="muted">{stats.agentCount} {tt("ajan")}</Badge>
                       </div>
                       <div className="flex items-center gap-3">
                         <p className="text-sm font-bold" style={{ ...fontMono, color: C.mint }}>{money(stats.fees)}</p>
@@ -3195,7 +3231,7 @@ export default function BlicPayAdmin() {
               {admin?.role !== 'agent' && (
               <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                Kat "Kliyan sèvi" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Nan detay chak siikisal (klike sou li), "Kliyan sèvi" konte sèlman sa yon AJAN konfime pandan peryòd la.
+                {tt("Kat \"Kliyan sèvi\" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Nan detay chak siikisal (klike sou li), \"Kliyan sèvi\" konte sèlman sa yon AJAN konfime pandan peryòd la.")}
               </div>
               )}
             </>
@@ -3207,8 +3243,8 @@ export default function BlicPayAdmin() {
         <div className="fadein">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
-              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>Ajan</h1>
-              <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>Kont ajan pou chak siikisal.</p>
+              <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>{tt("Ajan")}</h1>
+              <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>{tt("Kont ajan pou chak siikisal.")}</p>
             </div>
             <button onClick={() => {
                 setEditingAgentId(null);
@@ -3219,17 +3255,17 @@ export default function BlicPayAdmin() {
               }}
               className="bp-btn rounded-lg text-sm font-semibold text-white flex items-center gap-2"
               style={{ padding: '10px 16px', background: C.navy }}>
-              <UserPlus size={15} /> Nouvo ajan
+              <UserPlus size={15} /> {tt("Nouvo ajan")}
             </button>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap" style={{ marginTop: 22 }}>
-            <span className="text-xs font-medium" style={{ color: C.muted }}>Siikisal:</span>
+            <span className="text-xs font-medium" style={{ color: C.muted }}>{tt("Siikisal:")}</span>
             {branches.map((b) => (
-              <span key={b.id} title="Klike pou modifye" className="bp-btn flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold cursor-pointer"
+              <span key={b.id} title={tt("Klike pou modifye")} className="bp-btn flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold cursor-pointer"
                 onClick={() => openBranchEdit(b)} style={{ background: '#EFE7D8', color: C.navy }}>
                 {b.name} <span style={{ ...fontMono, opacity: 0.65, fontSize: 10.5 }}>{b.code}</span>
-                <button onClick={(e) => { e.stopPropagation(); deleteBranch(b); }} title="Efase siikisal la" aria-label="Efase siikisal la"
+                <button onClick={(e) => { e.stopPropagation(); deleteBranch(b); }} title={tt("Efase siikisal la")} aria-label={tt("Efase siikisal la")}
                   className="bp-btn w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(11,27,51,0.12)' }}>
                   <X size={9} color={C.navy} />
                 </button>
@@ -3238,26 +3274,26 @@ export default function BlicPayAdmin() {
             <button onClick={() => { setEditingBranchId(null); setBranchForm({ name: '', address: '', phone: '', managerName: '', openingHours: '' }); setShowBranchForm(true); }}
               className="bp-btn text-xs font-semibold flex items-center gap-1 rounded-full"
               style={{ padding: '6px 12px', background: C.bg, border: `1px solid ${C.border}`, color: C.navy }}>
-              <Building2 size={12} /> Nouvo siikisal
+              <Building2 size={12} /> {tt("Nouvo siikisal")}
             </button>
           </div>
 
           {loadingAgents ? (
-            <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>Ap chaje...</p>
+            <p className="text-sm text-center" style={{ color: C.muted, marginTop: 48 }}>{tt("Ap chaje...")}</p>
           ) : agents.length === 0 ? (
             <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '40px 24px', marginTop: 24 }}>
               <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 14 }}>
                 <UserPlus size={20} color={C.muted} />
               </div>
-              <p className="text-sm" style={{ color: C.muted }}>Pa gen okenn ajan kreye toujou.</p>
+              <p className="text-sm" style={{ color: C.muted }}>{tt("Pa gen okenn ajan kreye toujou.")}</p>
             </div>
           ) : (
             <div style={{ marginTop: 28 }}>
               {branches
                 .map((b) => b.name)
-                .concat(agents.some((a) => !branches.find((b) => b.name === a.branch)) ? ['Lòt'] : [])
+                .concat(agents.some((a) => !branches.find((b) => b.name === a.branch)) ? [tt("Lòt")] : [])
                 .map((branchName) => {
-                  const branchAgents = agents.filter((a) => (a.branch === branchName) || (branchName === 'Lòt' && !branches.find((b) => b.name === a.branch)));
+                  const branchAgents = agents.filter((a) => (a.branch === branchName) || (branchName === tt("Lòt") && !branches.find((b) => b.name === a.branch)));
                   if (branchAgents.length === 0) return null;
                   return (
                     <div key={branchName} style={{ marginBottom: 22 }}>
@@ -3278,12 +3314,12 @@ export default function BlicPayAdmin() {
                               </div>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? 'Bloke' : 'Aktif'}</Badge>
-                              <button onClick={(e) => { e.stopPropagation(); toggleAgentBlock(a); }} title={a.blocked ? 'Debloke' : 'Bloke'}
+                              <Badge tone={a.blocked ? 'danger' : 'mint'}>{a.blocked ? tt("Bloke") : tt("Aktif")}</Badge>
+                              <button onClick={(e) => { e.stopPropagation(); toggleAgentBlock(a); }} title={a.blocked ? tt("Debloke") : tt("Bloke@@btn")}
                                 className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
                                 <Lock size={12} color={C.muted} />
                               </button>
-                              <button onClick={(e) => { e.stopPropagation(); deleteAgent(a); }} title="Efase"
+                              <button onClick={(e) => { e.stopPropagation(); deleteAgent(a); }} title={tt("Efase")}
                                 className="bp-btn w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: '#FBEBE6' }}>
                                 <X size={12} color={C.danger} />
                               </button>
@@ -3306,33 +3342,33 @@ export default function BlicPayAdmin() {
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: C.card, zIndex: 53,
             boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: '30px 28px',
           }}>
-            <p className="text-base font-semibold" style={{ color: C.ink }}>{editingAgentId ? 'Modifye ajan' : 'Nouvo kont ajan'}</p>
+            <p className="text-base font-semibold" style={{ color: C.ink }}>{editingAgentId ? tt("Modifye ajan") : tt("Nouvo kont ajan")}</p>
             <p className="text-xs" style={{ color: C.muted, marginTop: 4, marginBottom: 22 }}>
-              {editingAgentId ? 'Kite modpas la vid si w pa vle chanje l.' : 'Kont sa a ka konfime depo/retrè pou siikisal li.'}
+              {editingAgentId ? tt("Kite modpas la vid si w pa vle chanje l.") : tt("Kont sa a ka konfime depo/retrè pou siikisal li.")}
             </p>
             <div className="flex flex-col" style={{ gap: 13 }}>
               <input value={agentForm.fullName} onChange={(e) => setAgentForm((f) => ({ ...f, fullName: e.target.value }))}
-                placeholder="Non konplè" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Non konplè")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={agentForm.phone} onChange={(e) => setAgentForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Nimewo telefòn" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Nimewo telefòn")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input type="password" value={agentForm.password} onChange={(e) => setAgentForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder={editingAgentId ? 'Modpas (kite vid pou kenbe ansyen an)' : 'Modpas (6+ karaktè)'}
+                placeholder={editingAgentId ? tt("Modpas (kite vid pou kenbe ansyen an)") : tt("Modpas (6+ karaktè)")}
                 className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <select value={agentForm.branch} onChange={(e) => setAgentForm((f) => ({ ...f, branch: e.target.value }))}
                 className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }}>
-                <option value="">Chwazi siikisal...</option>
+                <option value="">{tt("Chwazi siikisal...")}</option>
                 {branches.map((b) => (
                   <option key={b.id} value={b.name}>{b.name}</option>
                 ))}
               </select>
 
-              <p className="text-xs font-semibold" style={{ color: C.muted, marginTop: 8, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>Enfòmasyon anplis (opsyonèl)</p>
+              <p className="text-xs font-semibold" style={{ color: C.muted, marginTop: 8, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>{tt("Enfòmasyon anplis (opsyonèl)")}</p>
               <input type="email" value={agentForm.email} onChange={(e) => setAgentForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="Imèl" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Imèl")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={agentForm.idNumber} onChange={(e) => setAgentForm((f) => ({ ...f, idNumber: e.target.value }))}
-                placeholder="Nimewo pyès idantite (CIN)" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Nimewo pyès idantite (CIN)")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <div>
-                <label className="text-xs" style={{ color: C.muted }}>Dat anbochaj</label>
+                <label className="text-xs" style={{ color: C.muted }}>{tt("Dat anbochaj")}</label>
                 <input type="date" value={agentForm.hireDate} onChange={(e) => setAgentForm((f) => ({ ...f, hireDate: e.target.value }))}
                   className="mt-1.5 w-full rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               </div>
@@ -3347,7 +3383,7 @@ export default function BlicPayAdmin() {
                   )}
                 </div>
                 <span className="text-xs font-medium" style={{ color: C.muted }}>
-                  {agentPhotoFile ? agentPhotoFile.name : existingAgentPhoto ? 'Chanje foto pwofil la' : 'Foto pwofil (opsyonèl)'}
+                  {agentPhotoFile ? agentPhotoFile.name : existingAgentPhoto ? tt("Chanje foto pwofil la") : tt("Foto pwofil (opsyonèl)")}
                 </span>
                 <input type="file" accept="image/*" className="hidden" onChange={(e) => setAgentPhotoFile(e.target.files?.[0] || null)} />
               </label>
@@ -3355,11 +3391,11 @@ export default function BlicPayAdmin() {
             <div className="flex gap-2.5" style={{ marginTop: 24 }}>
               <button onClick={() => { setShowAgentForm(false); setEditingAgentId(null); }}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '12px', background: C.bg, color: C.muted }}>
-                Anile
+                {tt("Anile")}
               </button>
               <button onClick={createAgent} disabled={creatingAgent}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '12px', background: C.navy, opacity: creatingAgent ? 0.7 : 1 }}>
-                {creatingAgent ? 'Ap anrejistre...' : editingAgentId ? 'Anrejistre chanjman yo' : 'Kreye kont lan'}
+                {creatingAgent ? tt("Ap anrejistre...") : editingAgentId ? tt("Anrejistre chanjman yo") : tt("Kreye kont lan")}
               </button>
             </div>
           </div>
@@ -3373,30 +3409,30 @@ export default function BlicPayAdmin() {
             position: 'fixed', top: 0, right: 0, bottom: 0, width: 420, background: C.card, zIndex: 53,
             boxShadow: '-8px 0 24px rgba(11,27,51,0.15)', overflowY: 'auto', padding: '30px 28px',
           }}>
-            <p className="text-base font-semibold" style={{ color: C.ink }}>{editingBranchId ? 'Modifye siikisal' : 'Nouvo siikisal'}</p>
+            <p className="text-base font-semibold" style={{ color: C.ink }}>{editingBranchId ? tt("Modifye siikisal") : tt("Nouvo siikisal")}</p>
             <p className="text-xs" style={{ color: C.muted, marginTop: 4, marginBottom: 22 }}>
-              {editingBranchId ? 'Chanje non an mete tout ajan ki nan siikisal sa a ajou otomatikman.' : 'Yon kòd entèn ap jenere otomatikman pou li.'}
+              {editingBranchId ? tt("Chanje non an mete tout ajan ki nan siikisal sa a ajou otomatikman.") : tt("Yon kòd entèn ap jenere otomatikman pou li.")}
             </p>
             <div className="flex flex-col" style={{ gap: 13 }}>
               <input value={branchForm.name} onChange={(e) => setBranchForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Non siikisal la" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Non siikisal la")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.address} onChange={(e) => setBranchForm((f) => ({ ...f, address: e.target.value }))}
-                placeholder="Adrès / katye" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Adrès / katye")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.phone} onChange={(e) => setBranchForm((f) => ({ ...f, phone: e.target.value }))}
-                placeholder="Telefòn biwo a" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Telefòn biwo a")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.managerName} onChange={(e) => setBranchForm((f) => ({ ...f, managerName: e.target.value }))}
-                placeholder="Non responsab la" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Non responsab la")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
               <input value={branchForm.openingHours} onChange={(e) => setBranchForm((f) => ({ ...f, openingHours: e.target.value }))}
-                placeholder="Orè (egzanp: Lendi-Vandredi 8h-16h)" className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
+                placeholder={tt("Orè (egzanp: Lendi-Vandredi 8h-16h)")} className="rounded-lg text-sm" style={{ padding: '11px 14px', background: C.bg, border: `1px solid ${C.border}` }} />
             </div>
             <div className="flex gap-2.5" style={{ marginTop: 24 }}>
               <button onClick={() => { setShowBranchForm(false); setEditingBranchId(null); }}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold" style={{ padding: '12px', background: C.bg, color: C.muted }}>
-                Anile
+                {tt("Anile")}
               </button>
               <button onClick={createBranch} disabled={creatingBranch}
                 className="bp-btn flex-1 rounded-lg text-sm font-semibold text-white" style={{ padding: '12px', background: C.navy, opacity: creatingBranch ? 0.7 : 1 }}>
-                {creatingBranch ? 'Ap anrejistre...' : editingBranchId ? 'Anrejistre chanjman yo' : 'Kreye siikisal la'}
+                {creatingBranch ? tt("Ap anrejistre...") : editingBranchId ? tt("Anrejistre chanjman yo") : tt("Kreye siikisal la")}
               </button>
             </div>
           </div>
@@ -3419,38 +3455,38 @@ export default function BlicPayAdmin() {
                   <X size={14} color={C.muted} />
                 </button>
               </div>
-              <Badge tone="muted">{stats.agentCount} ajan</Badge>
+              <Badge tone="muted">{stats.agentCount} {tt("ajan")}</Badge>
 
               <div className="rounded-xl" style={{ marginTop: 18, padding: 16, background: C.bg }}>
-                <p className="text-xs" style={{ color: C.muted }}>Revni jenere</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Revni jenere")}</p>
                 <p className="text-xl font-bold" style={{ ...fontMono, color: C.mint, marginTop: 4 }}>{money(stats.fees)}</p>
               </div>
 
               <div className="flex flex-col" style={{ gap: 14, marginTop: 18 }}>
                 <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
                   <div>
-                    <p className="text-sm" style={{ color: C.ink }}>Depo</p>
-                    <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} tranzaksyon</p>
+                    <p className="text-sm" style={{ color: C.ink }}>{tt("Depo")}</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{stats.depositCount} {tt("tranzaksyon")}</p>
                   </div>
                   <p className="text-sm font-semibold" style={fontMono}>{money(stats.depositVolume)}</p>
                 </div>
                 <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
                   <div>
-                    <p className="text-sm" style={{ color: C.ink }}>Retrè</p>
-                    <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} tranzaksyon</p>
+                    <p className="text-sm" style={{ color: C.ink }}>{tt("Retrè")}</p>
+                    <p className="text-xs" style={{ color: C.muted }}>{stats.withdrawalCount} {tt("tranzaksyon")}</p>
                   </div>
                   <p className="text-sm font-semibold" style={fontMono}>{money(stats.withdrawalVolume)}</p>
                 </div>
                 <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
-                  <p className="text-sm" style={{ color: C.ink }}>Volim total</p>
+                  <p className="text-sm" style={{ color: C.ink }}>{tt("Volim total")}</p>
                   <p className="text-sm font-semibold" style={fontMono}>{money(stats.volume)}</p>
                 </div>
                 <div className="flex items-center justify-between" style={{ paddingBottom: 12, borderBottom: `1px solid ${C.border}` }}>
-                  <p className="text-sm" style={{ color: C.ink }}>Mwayèn pa tranzaksyon</p>
+                  <p className="text-sm" style={{ color: C.ink }}>{tt("Mwayèn pa tranzaksyon")}</p>
                   <p className="text-sm font-semibold" style={fontMono}>{money(avgTx)}</p>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-sm" style={{ color: C.ink }}>Kliyan sèvi (pa ajan)</p>
+                  <p className="text-sm" style={{ color: C.ink }}>{tt("Kliyan sèvi (pa ajan)")}</p>
                   <p className="text-sm font-semibold" style={fontMono}>{stats.uniqueClients || 0}</p>
                 </div>
               </div>
@@ -3469,22 +3505,22 @@ export default function BlicPayAdmin() {
             <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#F3E8D2' }}>
               <AlertCircle size={16} color="#8A6423" className="shrink-0 mt-0.5" />
               <p className="text-xs" style={{ color: '#8A6423' }}>
-                Verifye peman an FINI e reyèlman rive nan kont ou anvan ou konfime — aksyon sa a p ap ka anile.
+                {tt("Verifye peman an FINI e reyèlman rive nan kont ou anvan ou konfime — aksyon sa a p ap ka anile.")}
               </p>
             </div>
-            <p className="text-sm font-semibold">Konfime depo {confirmingDeposit.user}?</p>
+            <p className="text-sm font-semibold">{tt("Konfime depo")} {confirmingDeposit.user}?</p>
             <p className="text-xs mt-1" style={{ color: C.muted }}>
               {money(confirmingDeposit.amount)} · {methodIcons[confirmingDeposit.method]?.label || confirmingDeposit.method}
-              {confirmingDeposit.transactionId ? ` · TID: ${confirmingDeposit.transactionId}` : ''}
+              {confirmingDeposit.transactionId ? tt(" · TID: {0}", confirmingDeposit.transactionId) : ''}
             </p>
             <div className="flex gap-2.5 mt-5">
               <button onClick={() => setConfirmingDeposit(null)}
                 className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold" style={{ background: C.bg, color: C.muted }}>
-                Anile
+                {tt("Anile")}
               </button>
               <button onClick={() => { confirmDeposit(confirmingDeposit.id); setConfirmingDeposit(null); }}
                 className="bp-btn flex-1 py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.mint }}>
-                Wi, konfime li
+                {tt("Wi, konfime li")}
               </button>
             </div>
           </div>
@@ -3500,15 +3536,15 @@ export default function BlicPayAdmin() {
           }}>
             <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
               <div>
-                <p className="text-sm font-semibold">Resi — {viewingReceipt.user}</p>
-                <p className="text-xs" style={{ ...fontMono, color: C.muted }}>TID: {viewingReceipt.transactionId} · {money(viewingReceipt.amount)}</p>
+                <p className="text-sm font-semibold">{tt("Resi —")} {viewingReceipt.user}</p>
+                <p className="text-xs" style={{ ...fontMono, color: C.muted }}>{tt("TID:")} {viewingReceipt.transactionId} · {money(viewingReceipt.amount)}</p>
               </div>
               <button onClick={() => setViewingReceipt(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }}>
                 <X size={14} color={C.muted} />
               </button>
             </div>
             <div className="flex-1 overflow-auto p-3 flex items-center justify-center" style={{ background: C.bg }}>
-              <img src={`data:${viewingReceipt.proofMimeType};base64,${viewingReceipt.proofImage}`} alt="Resi"
+              <img src={`data:${viewingReceipt.proofMimeType};base64,${viewingReceipt.proofImage}`} alt={tt("Resi")}
                 className="max-w-full max-h-full rounded-lg object-contain" />
             </div>
           </div>
@@ -3525,9 +3561,9 @@ export default function BlicPayAdmin() {
             <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
               <div className="flex items-center gap-2">
                 <KeyRound size={16} color={C.navy} />
-                <p className="text-sm font-semibold">Chanje modpas</p>
+                <p className="text-sm font-semibold">{tt("Chanje modpas")}</p>
               </div>
-              <button onClick={() => setPwModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }} aria-label="Fèmen">
+              <button onClick={() => setPwModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }} aria-label={tt("Fèmen")}>
                 <X size={14} color={C.muted} />
               </button>
             </div>
@@ -3536,18 +3572,18 @@ export default function BlicPayAdmin() {
                 <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(61,122,92,0.12)' }}>
                   <Check size={22} color={C.mint} />
                 </div>
-                <p className="text-sm font-semibold">Modpas ou chanje.</p>
-                <p className="text-xs" style={{ color: C.muted }}>Itilize nouvo modpas la pwochen fwa ou konekte.</p>
+                <p className="text-sm font-semibold">{tt("Modpas ou chanje.")}</p>
+                <p className="text-xs" style={{ color: C.muted }}>{tt("Itilize nouvo modpas la pwochen fwa ou konekte.")}</p>
                 <button onClick={() => setPwModalOpen(false)} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.navy }}>
-                  Fèmen
+                  {tt("Fèmen")}
                 </button>
               </div>
             ) : (
               <form className="p-5 flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); changePassword(); }}>
                 {[
-                  { key: 'current', label: 'Modpas aktyèl', auto: 'current-password' },
-                  { key: 'next', label: 'Nouvo modpas (6+ karaktè)', auto: 'new-password' },
-                  { key: 'confirm', label: 'Konfime nouvo modpas la', auto: 'new-password' },
+                  { key: 'current', label: tt("Modpas aktyèl"), auto: 'current-password' },
+                  { key: 'next', label: tt("Nouvo modpas (6+ karaktè)"), auto: 'new-password' },
+                  { key: 'confirm', label: tt("Konfime nouvo modpas la"), auto: 'new-password' },
                 ].map((f) => (
                   <label key={f.key} className="flex flex-col gap-1">
                     <span className="text-xs font-semibold" style={{ color: C.muted }}>{f.label}</span>
@@ -3567,7 +3603,7 @@ export default function BlicPayAdmin() {
                   </div>
                 )}
                 <button type="submit" disabled={pwBusy} className="py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.navy, opacity: pwBusy ? 0.6 : 1 }}>
-                  {pwBusy ? 'Ap chanje…' : 'Chanje modpas la'}
+                  {pwBusy ? tt("Ap chanje…") : tt("Chanje modpas la")}
                 </button>
               </form>
             )}
