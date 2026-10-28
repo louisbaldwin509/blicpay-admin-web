@@ -3,7 +3,7 @@ import {
   Bell, ShieldCheck, Users, Clock, Check, X, Building2, Smartphone,
   DollarSign, Banknote, ArrowLeftRight, LogOut, LayoutGrid, Wallet,
   AlertCircle, ChevronRight, ChevronLeft, Search, RefreshCw, ArrowDownLeft,
-  PiggyBank, HandCoins, FileText, User, Phone, Lock, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
+  PiggyBank, HandCoins, FileText, User, Phone, Lock, KeyRound, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
 } from 'lucide-react';
 
 const API_BASE_URL = 'https://api.blicpayht.com';
@@ -234,6 +234,12 @@ export default function BlicPayAdmin() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [viewingReceipt, setViewingReceipt] = useState(null);
+  // Chanje modpas pwòp kont admin/ajan an
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState(false);
+  const [pwBusy, setPwBusy] = useState(false);
   const [confirmingDeposit, setConfirmingDeposit] = useState(null);
   const [confirmingWithdrawal, setConfirmingWithdrawal] = useState(null);
   const [withdrawalProofFile, setWithdrawalProofFile] = useState(null);
@@ -834,6 +840,43 @@ export default function BlicPayAdmin() {
     }
   }
 
+  function openPasswordModal() {
+    setPwForm({ current: '', next: '', confirm: '' });
+    setPwError('');
+    setPwSuccess(false);
+    setPwModalOpen(true);
+  }
+
+  async function changePassword() {
+    setPwError('');
+    if (!pwForm.current || !pwForm.next) {
+      setPwError('Ranpli tout chan yo.');
+      return;
+    }
+    if (pwForm.next.length < 6) {
+      setPwError('Nouvo modpas la dwe gen omwen 6 karaktè.');
+      return;
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwError('De nouvo modpas yo pa menm.');
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await apiFetch('/auth/change-password', {
+        method: 'POST',
+        token,
+        body: { currentPassword: pwForm.current, newPassword: pwForm.next },
+      });
+      setPwSuccess(true);
+      setPwForm({ current: '', next: '', confirm: '' });
+    } catch (err) {
+      setPwError(err.message);
+    } finally {
+      setPwBusy(false);
+    }
+  }
+
   function logout() {
     setToken(null);
     setAdmin(null);
@@ -1083,6 +1126,9 @@ export default function BlicPayAdmin() {
                 </p>
               </div>
             </div>
+            <button onClick={openPasswordModal} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label="Chanje modpas" title="Chanje modpas">
+              <KeyRound size={15} color="#fff" />
+            </button>
             <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label="Dekonekte">
               <LogOut size={15} color="#fff" />
             </button>
@@ -3163,6 +3209,66 @@ export default function BlicPayAdmin() {
               <img src={`data:${viewingReceipt.proofMimeType};base64,${viewingReceipt.proofImage}`} alt="Resi"
                 className="max-w-full max-h-full rounded-lg object-contain" />
             </div>
+          </div>
+        </>
+      )}
+
+      {pwModalOpen && (
+        <>
+          <div onClick={() => !pwBusy && setPwModalOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 50 }} />
+          <div className="fadein" style={{
+            position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(420px, 92vw)',
+            background: C.card, borderRadius: 16, zIndex: 51, overflow: 'hidden',
+          }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-2">
+                <KeyRound size={16} color={C.navy} />
+                <p className="text-sm font-semibold">Chanje modpas</p>
+              </div>
+              <button onClick={() => setPwModalOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }} aria-label="Fèmen">
+                <X size={14} color={C.muted} />
+              </button>
+            </div>
+            {pwSuccess ? (
+              <div className="p-5 flex flex-col items-center gap-3 text-center">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center" style={{ background: 'rgba(61,122,92,0.12)' }}>
+                  <Check size={22} color={C.mint} />
+                </div>
+                <p className="text-sm font-semibold">Modpas ou chanje.</p>
+                <p className="text-xs" style={{ color: C.muted }}>Itilize nouvo modpas la pwochen fwa ou konekte.</p>
+                <button onClick={() => setPwModalOpen(false)} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.navy }}>
+                  Fèmen
+                </button>
+              </div>
+            ) : (
+              <form className="p-5 flex flex-col gap-3" onSubmit={(e) => { e.preventDefault(); changePassword(); }}>
+                {[
+                  { key: 'current', label: 'Modpas aktyèl', auto: 'current-password' },
+                  { key: 'next', label: 'Nouvo modpas (6+ karaktè)', auto: 'new-password' },
+                  { key: 'confirm', label: 'Konfime nouvo modpas la', auto: 'new-password' },
+                ].map((f) => (
+                  <label key={f.key} className="flex flex-col gap-1">
+                    <span className="text-xs font-semibold" style={{ color: C.muted }}>{f.label}</span>
+                    <input
+                      type="password"
+                      autoComplete={f.auto}
+                      value={pwForm[f.key]}
+                      onChange={(e) => setPwForm((p) => ({ ...p, [f.key]: e.target.value }))}
+                      className="px-3 py-2.5 rounded-lg text-sm outline-none"
+                      style={{ border: `1px solid ${C.border}`, background: C.bg }}
+                    />
+                  </label>
+                ))}
+                {pwError && (
+                  <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style={{ background: 'rgba(181,72,46,0.1)', color: C.danger }}>
+                    <AlertCircle size={14} /> {pwError}
+                  </div>
+                )}
+                <button type="submit" disabled={pwBusy} className="py-2.5 rounded-lg text-sm font-semibold text-white" style={{ background: C.navy, opacity: pwBusy ? 0.6 : 1 }}>
+                  {pwBusy ? 'Ap chanje…' : 'Chanje modpas la'}
+                </button>
+              </form>
+            )}
           </div>
         </>
       )}
