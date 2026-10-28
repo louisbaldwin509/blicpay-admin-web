@@ -141,6 +141,305 @@ function EmptyRow({ colSpan, children }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// KONT ANTREPRIZ — egzamine dosye legal yo (lis, detay, dokiman, desizyon).
+// ---------------------------------------------------------------------------
+const BIZ_STATUS = {
+  draft: { label: 'Pou ranpli', tone: 'muted' },
+  submitted: { label: 'Ap tann egzamen', tone: 'amber' },
+  needs_info: { label: 'Enfòmasyon mande', tone: 'premium' },
+  approved: { label: 'Apwouve', tone: 'mint' },
+  rejected: { label: 'Refize', tone: 'danger' },
+};
+const BIZ_FILTERS = [
+  { id: 'submitted', label: 'Ap tann' },
+  { id: 'needs_info', label: 'Enfòmasyon mande' },
+  { id: 'approved', label: 'Apwouve' },
+  { id: 'rejected', label: 'Refize' },
+  { id: 'draft', label: 'Pou ranpli' },
+  { id: '', label: 'Tout' },
+];
+const BIZ_FIELDS = [
+  ['legalName', 'Rezon sosyal'], ['tradeName', 'Non komèsyal'], ['nif', 'NIF'], ['patenteNumber', 'Patant'],
+  ['sector', 'Sektè'], ['address', 'Adrès'], ['city', 'Vil'], ['businessPhone', 'Telefòn'],
+  ['businessEmail', 'Imèl'], ['website', 'Sit entènèt'], ['repTitle', 'Pozisyon reprezantan'],
+];
+
+function BusinessReview({ token }) {
+  const [types, setTypes] = useState(null);
+  const [filter, setFilter] = useState('submitted');
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [viewer, setViewer] = useState(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const T = (l) => (l ? l.ht || l.fr : '');
+  const docLabel = (k) => T(types?.documents?.[k]) || k;
+  const formLabel = (k) => T(types?.legalForms?.[k]?.label) || k;
+
+  React.useEffect(() => {
+    apiFetch('/business/types').then(setTypes).catch(() => {});
+  }, []);
+
+  async function loadList(f = filter) {
+    setLoading(true);
+    try {
+      const { businesses } = await apiFetch(`/admin/businesses${f ? `?status=${f}` : ''}`, { token });
+      setList(businesses);
+    } catch (e) {
+      setMsg({ error: true, text: e.message });
+    } finally {
+      setLoading(false);
+    }
+  }
+  React.useEffect(() => { loadList(filter); }, [filter]);
+
+  async function open(b) {
+    setSelected(b);
+    setDetail(null);
+    setNote('');
+    setMsg(null);
+    try {
+      setDetail(await apiFetch(`/admin/businesses/${b.id}`, { token }));
+    } catch (e) {
+      setMsg({ error: true, text: e.message });
+    }
+  }
+
+  async function viewDoc(d) {
+    setViewer({ loading: true, doc: d });
+    try {
+      const { document } = await apiFetch(`/admin/businesses/${selected.id}/documents/${d.id}`, { token });
+      setViewer({ doc: document });
+    } catch (e) {
+      setViewer(null);
+      setMsg({ error: true, text: e.message });
+    }
+  }
+
+  async function setDocStatus(d, status) {
+    let docNote = null;
+    if (status === 'rejected') {
+      docNote = window.prompt('Poukisa dokiman sa a refize? (kliyan an ap wè mesaj sa a)');
+      if (!docNote) return;
+    }
+    try {
+      await apiFetch(`/admin/businesses/${selected.id}/documents/${d.id}`, { method: 'PATCH', token, body: { status, note: docNote } });
+      await open(selected);
+    } catch (e) {
+      setMsg({ error: true, text: e.message });
+    }
+  }
+
+  async function decide(action) {
+    if ((action === 'reject' || action === 'request-info') && !note.trim()) {
+      setMsg({ error: true, text: action === 'reject' ? 'Ekri rezon refi a anvan.' : 'Ekri sa kliyan an dwe voye anvan.' });
+      return;
+    }
+    setBusy(true);
+    setMsg(null);
+    try {
+      const body = action === 'reject' ? { reason: note } : action === 'request-info' ? { note } : {};
+      await apiFetch(`/admin/businesses/${selected.id}/${action}`, { method: 'POST', token, body });
+      setMsg({ text: action === 'approve' ? 'Kont antrepriz la apwouve. Kliyan an resevwa yon notifikasyon.' : action === 'reject' ? 'Dosye a refize. Kliyan an resevwa rezon an.' : 'Demand enfòmasyon an voye bay kliyan an.' });
+      await open(selected);
+      loadList();
+    } catch (e) {
+      setMsg({ error: true, text: e.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const Msg = () => msg ? (
+    <div className="mt-4 flex items-center gap-2 text-sm px-3 py-2.5 rounded-lg" style={{ background: msg.error ? 'rgba(181,72,46,0.10)' : 'rgba(61,122,92,0.10)', color: msg.error ? C.danger : '#2B5842' }}>
+      {msg.error ? <AlertCircle size={15} /> : <Check size={15} />} {msg.text}
+    </div>
+  ) : null;
+
+  if (!selected) {
+    return (
+      <div className="fadein">
+        <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>Kont Antrepriz</h1>
+        <p className="text-sm mt-1" style={{ color: C.muted }}>Egzamine dosye legal antrepriz yo anvan ou aktive kont lan (plafon antrepriz, resepsyon peman, non komèsyal).</p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {BIZ_FILTERS.map((f) => (
+            <button key={f.id} onClick={() => setFilter(f.id)} className="bp-btn px-3 py-1.5 rounded-full text-xs font-semibold"
+              style={{ background: filter === f.id ? C.navy : C.card, color: filter === f.id ? '#fff' : C.ink, border: `1px solid ${filter === f.id ? C.navy : C.border}` }}>
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <Msg />
+        <div className="mt-5 flex flex-col gap-3">
+          {loading ? (
+            <p className="text-sm p-6 text-center" style={{ color: C.muted }}>Ap chaje...</p>
+          ) : list.length === 0 ? (
+            <p className="text-sm p-5 rounded-xl" style={{ color: C.muted, background: C.card, border: `1px solid ${C.border}` }}>Pa gen dosye nan kategori sa a.</p>
+          ) : list.map((b) => (
+            <button key={b.id} onClick={() => open(b)} className="bp-btn text-left p-4 rounded-xl flex items-center justify-between gap-3"
+              style={{ background: C.card, border: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: C.bg }}>
+                  <Building2 size={16} color={C.navy} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{b.tradeName ? `${b.tradeName} — ` : ''}{b.legalName}</p>
+                  <p className="text-xs mt-0.5" style={{ color: C.muted }}>
+                    {formLabel(b.legalForm)} · {b.user.fullName} · {b.user.clientId} · {b._count.documents} dokiman
+                    {b.submittedAt ? ` · soumèt ${new Date(b.submittedAt).toLocaleDateString('fr-FR')}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {!b.user.verified && <Badge tone="danger">KYC pa fèt</Badge>}
+                <Badge tone={BIZ_STATUS[b.status]?.tone}>{BIZ_STATUS[b.status]?.label}</Badge>
+                <ChevronRight size={16} color={C.muted} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const b = detail?.business;
+  const reqs = detail?.requirements || { required: [], optional: [] };
+  const docs = b?.documents || [];
+  const docFor = (k) => docs.find((d) => d.docType === k);
+
+  return (
+    <div className="fadein">
+      <button onClick={() => { setSelected(null); setDetail(null); setMsg(null); }} className="flex items-center gap-1.5 text-sm mb-4" style={{ color: C.muted }}>
+        <ChevronLeft size={15} /> Retounen nan lis la
+      </button>
+      {!b ? (
+        <p className="text-sm" style={{ color: C.muted }}>Ap chaje dosye a...</p>
+      ) : (
+        <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+          <div className="p-5 rounded-2xl flex flex-col gap-4" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20 }}>{b.legalName}</p>
+                <p className="text-xs mt-1" style={{ color: C.muted }}>{formLabel(b.legalForm)}</p>
+              </div>
+              <Badge tone={BIZ_STATUS[b.status]?.tone}>{BIZ_STATUS[b.status]?.label}</Badge>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+              {BIZ_FIELDS.map(([k, label]) => (
+                <div key={k}>
+                  <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{label}</p>
+                  <p className="text-sm" style={{ color: b[k] ? C.ink : C.muted }}>{b[k] || '—'}</p>
+                </div>
+              ))}
+              <div>
+                <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>Chif dafè</p>
+                <p className="text-sm">{T(types?.turnoverRanges?.[b.turnoverRange]) || '—'}</p>
+              </div>
+            </div>
+            <div className="p-3 rounded-lg" style={{ background: C.bg }}>
+              <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>Reprezantan legal</p>
+              <div className="flex items-center justify-between mt-1 gap-2">
+                <div>
+                  <p className="text-sm font-semibold">{b.user.fullName}</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{b.user.phone} · {b.user.clientId}</p>
+                </div>
+                {b.user.verified ? <Badge tone="mint">KYC verifye</Badge> : <Badge tone="danger">KYC pa verifye</Badge>}
+              </div>
+            </div>
+            {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>Dènye nòt: {b.adminNote}</p>}
+          </div>
+
+          <div className="p-5 rounded-2xl flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}` }}>
+            <p className="font-bold">Dokiman legal</p>
+            {[...reqs.required.map((k) => [k, true]), ...reqs.optional.map((k) => [k, false])].map(([k, req]) => {
+              const d = docFor(k);
+              return (
+                <div key={k} className="p-3 rounded-lg flex items-center justify-between gap-3" style={{ border: `1px solid ${C.border}` }}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{docLabel(k)}</p>
+                    <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                      {!d ? <Badge tone={req ? 'danger' : 'muted'}>{req ? 'Manke' : 'Opsyonèl'}</Badge>
+                        : d.status === 'accepted' ? <Badge tone="mint">Aksepte</Badge>
+                        : d.status === 'rejected' ? <Badge tone="danger">Refize</Badge>
+                        : <Badge tone="amber">Pou egzamine</Badge>}
+                      {d && <span className="text-xs" style={{ color: C.muted }}>{d.mimeType === 'application/pdf' ? 'PDF' : 'Foto'} · {new Date(d.uploadedAt).toLocaleDateString('fr-FR')}</span>}
+                    </div>
+                    {d?.note && <p className="text-xs mt-1" style={{ color: C.danger }}>{d.note}</p>}
+                  </div>
+                  {d && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => viewDoc(d)} className="bp-btn px-2.5 py-1.5 rounded-md text-xs font-semibold flex items-center gap-1" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}` }}>
+                        <Eye size={12} /> Wè
+                      </button>
+                      {d.status !== 'accepted' && (
+                        <button onClick={() => setDocStatus(d, 'accepted')} title="Aksepte" className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'rgba(61,122,92,0.12)' }}>
+                          <Check size={14} color={C.mint} />
+                        </button>
+                      )}
+                      {d.status !== 'rejected' && (
+                        <button onClick={() => setDocStatus(d, 'rejected')} title="Refize" className="bp-btn w-7 h-7 rounded-md flex items-center justify-center" style={{ background: 'rgba(181,72,46,0.10)' }}>
+                          <X size={14} color={C.danger} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            <div className="mt-2 pt-4 flex flex-col gap-2" style={{ borderTop: `1px solid ${C.border}` }}>
+              <p className="font-bold">Desizyon</p>
+              {detail.missing?.length > 0 && (
+                <p className="text-xs p-2.5 rounded-lg" style={{ background: 'rgba(181,72,46,0.08)', color: C.danger }}>
+                  Dosye a pa konplè: {detail.missing.map((m) => (m.startsWith('doc:') ? docLabel(m.slice(4)) : m.slice(6))).join(', ')}
+                </p>
+              )}
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder="Rezon refi a oswa sa kliyan an dwe voye (obligatwa pou refize / mande enfòmasyon)"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ border: `1px solid ${C.border}`, background: C.bg, resize: 'vertical' }} />
+              <div className="flex flex-wrap gap-2">
+                <button disabled={busy} onClick={() => decide('approve')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ background: C.mint, opacity: busy ? 0.6 : 1 }}>
+                  <BadgeCheck size={15} /> Apwouve kont antrepriz la
+                </button>
+                <button disabled={busy} onClick={() => decide('request-info')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}`, opacity: busy ? 0.6 : 1 }}>
+                  <FileText size={15} /> Mande plis enfòmasyon
+                </button>
+                <button disabled={busy} onClick={() => decide('reject')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5" style={{ background: 'rgba(181,72,46,0.10)', color: C.danger, opacity: busy ? 0.6 : 1 }}>
+                  <X size={15} /> Refize
+                </button>
+              </div>
+              {!b.user.verified && <p className="text-xs" style={{ color: C.danger }}>Atansyon: reprezantan legal la poko verifye idantite l (KYC).</p>}
+              <Msg />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewer && (
+        <>
+          <div onClick={() => setViewer(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 50 }} />
+          <div className="fadein" style={{ position: 'fixed', top: '5%', left: '5%', right: '5%', bottom: '5%', background: C.card, borderRadius: 16, zIndex: 51, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <p className="text-sm font-semibold">{docLabel(viewer.doc.docType)}{viewer.doc.fileName ? ` — ${viewer.doc.fileName}` : ''}</p>
+              <button onClick={() => setViewer(null)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }}><X size={14} color={C.muted} /></button>
+            </div>
+            <div className="flex-1 overflow-auto p-3 flex items-center justify-center" style={{ background: C.bg }}>
+              {viewer.loading ? <p className="text-sm" style={{ color: C.muted }}>Ap chaje dokiman an...</p>
+                : viewer.doc.mimeType === 'application/pdf'
+                  ? <iframe title="dokiman" src={`data:application/pdf;base64,${viewer.doc.fileData}`} style={{ width: '100%', height: '100%', border: 0, background: '#fff' }} />
+                  : <img src={`data:${viewer.doc.mimeType};base64,${viewer.doc.fileData}`} alt="Dokiman" className="max-w-full max-h-full rounded-lg object-contain" />}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function BlicPayAdmin() {
   const [token, setToken] = useState(null);
   const [admin, setAdmin] = useState(null);
@@ -990,6 +1289,7 @@ export default function BlicPayAdmin() {
     { id: 'transfers', label: 'Transfè', icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
     { id: 'sol', label: 'BLIC Sòl', icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: false },
     { id: 'solPayouts', label: 'Pòch Sòl resevwa', icon: HandCoins, onOpen: () => loadSolPayouts(), adminOnly: false },
+    { id: 'business', label: 'Antrepriz', icon: Building2, adminOnly: true },
     { id: 'kyc', label: 'Verifikasyon KYC', icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
     { id: 'verificationRequests', label: 'Dokiman Siplemantè', icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
     { id: 'support', label: 'Mesaj Sipò', icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
@@ -2043,6 +2343,8 @@ export default function BlicPayAdmin() {
               </div>
             </div>
           )}
+
+          {nav === 'business' && <BusinessReview token={token} />}
 
           {nav === 'kyc' && (
             <div className="fadein">
