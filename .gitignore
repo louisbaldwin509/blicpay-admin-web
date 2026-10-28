@@ -1,0 +1,4 @@
+# Fichye lokal — Vercel konstwi pwòp vèsyon pa l
+node_modules/
+dist/
+package-lock.json
