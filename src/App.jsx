@@ -949,6 +949,69 @@ function AuditPage({ token, flash }) {
   );
 }
 
+// Fich idantifikasyon kliyan an (CIP) — sa kliyan an deklare lè l louvri kont lan.
+const CP_LABELS = {
+  country: { HT: 'Ayiti', US: 'Etazini', CA: 'Kanada', FR: 'Frans', DO: 'Repiblik Dominikèn', CL: 'Chili', BR: 'Brezil', OTHER: 'Lòt peyi' },
+  idType: { cin: 'CIN', nif: 'NIF', passport: 'Paspò', license: 'Lisans kondwi' },
+  occupation: { employed: 'Anplwaye', self_employed: 'Travayè endepandan / komèsan', business_owner: 'Pwopriyetè biznis', student: 'Etidyan', unemployed: 'San travay', retired: 'Retrete', other: 'Lòt@@cp' },
+  sourceOfFunds: { salary: 'Salè', business: 'Revni biznis', remittances: 'Transfè fanmi (dyaspora)', savings: 'Epay@@cp', pension: 'Pansyon', other: 'Lòt@@cp' },
+  volume: { lt25k: '< 25 000 HTG', '25k_100k': '25 000 – 100 000 HTG', '100k_500k': '100 000 – 500 000 HTG', gt500k: '> 500 000 HTG' },
+};
+function ClientProfileCard({ u }) {
+  const d = (v) => (v ? new Date(v).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { timeZone: 'UTC' }) : '');
+  const L = (map, v) => (v && map[v] ? tt(map[v]) : v || '');
+  const age = u.dateOfBirth ? Math.floor((Date.now() - new Date(u.dateOfBirth).getTime()) / (365.25 * 86400000)) : null;
+  const rows = [
+    [tt('Idantite@@cp'), [
+      [tt('Dat nesans@@cp'), u.dateOfBirth ? `${d(u.dateOfBirth)} (${age} ${tt('an@@age')})` : ''],
+      [tt('Sèks@@cp'), u.gender === 'F' ? tt('Fi@@cp') : u.gender === 'M' ? tt('Gason@@cp') : ''],
+      [tt('Nasyonalite@@cp'), L(CP_LABELS.country, u.nationality)],
+      [tt('Kote li fèt'), u.birthPlace],
+    ]],
+    [tt('Kowòdone@@cp'), [
+      [tt('Imèl@@cp'), u.email],
+      [tt('Adrès@@cp'), [u.addressLine, u.city, u.department, L(CP_LABELS.country, u.country)].filter(Boolean).join(', ')],
+    ]],
+    [tt('Pyès idantite@@cp'), [
+      [L(CP_LABELS.idType, u.idType) || tt('Nimewo@@cp'), u.idNumber],
+      [tt('Ekspirasyon@@cp'), d(u.idExpiry)],
+    ]],
+    [tt('Pwofil finansye@@cp'), [
+      [tt('Okipasyon@@cp'), [L(CP_LABELS.occupation, u.occupation), u.employer].filter(Boolean).join(' · ')],
+      [tt('Sous lajan@@cp'), L(CP_LABELS.sourceOfFunds, u.sourceOfFunds)],
+      [tt('Volim pa mwa@@cp'), L(CP_LABELS.volume, u.expectedMonthlyVolume)],
+      ['PEP', u.isPep == null ? '' : u.isPep ? tt('Wi@@cp') : tt('Non@@cp')],
+      [tt('Kondisyon aksepte'), u.termsAcceptedAt ? `${d(u.termsAcceptedAt)} · v${u.termsVersion || '?'}` : ''],
+    ]],
+  ];
+  const empty = rows.every(([, rs]) => rs.every(([, v]) => !v));
+  return (
+    <div className="mt-5">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold" style={{ color: C.muted }}>{tt('Fich kliyan (KYC)')}</p>
+        {u.isPep && <span className="text-[11px] font-bold px-2 py-0.5 rounded" style={{ background: '#FDECEC', color: '#9B2C2C' }}>PEP</span>}
+      </div>
+      {empty ? (
+        <p className="mt-2 text-xs" style={{ color: C.muted }}>{tt('Kliyan sa a te kreye kont li anvan fòm konplè a — enfòmasyon yo poko la.')}</p>
+      ) : (
+        <div className="mt-2 rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+          {rows.map(([title, rs]) => (
+            <div key={title}>
+              <div className="px-3 py-1.5 text-[10.5px] font-semibold uppercase tracking-wider" style={{ background: C.bg, color: C.muted }}>{title}</div>
+              {rs.filter(([, v]) => v).map(([k, v]) => (
+                <div key={k} className="flex items-start justify-between gap-3 px-3 py-2 text-xs" style={{ borderTop: `1px solid ${C.border}` }}>
+                  <span style={{ color: C.muted }}>{k}</span>
+                  <span className="font-semibold text-right" style={{ color: C.ink }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BlicPayAdmin() {
   const [lang, setLangState] = useState(CURRENT_LANG);
   const setLang = (l) => { setLangState(l); try { localStorage.setItem('blicpay_admin_lang', l); } catch { /* pa enpòtan */ } };
@@ -3390,6 +3453,8 @@ export default function BlicPayAdmin() {
                 <KeyRound size={12} /> {selectedUser.betaAccess ? tt("Retire aksè tès") : tt("Bay aksè tès (tèstè)")}
               </button>
             )}
+
+            {userDetail?.user && selectedUser.role === 'member' && <ClientProfileCard u={userDetail.user} />}
 
             <p className="mt-5 text-sm font-semibold" style={{ color: C.muted }}>{tt("Ajisteman manyèl balans")}</p>
             <div className="mt-2 flex items-center gap-2">
