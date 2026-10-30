@@ -4,6 +4,7 @@ import {
   DollarSign, Banknote, ArrowLeftRight, LogOut, LayoutGrid, Wallet,
   AlertCircle, ChevronRight, ChevronLeft, Search, RefreshCw, ArrowDownLeft,
   PiggyBank, HandCoins, FileText, User, Phone, Lock, KeyRound, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
+  ShieldAlert, Scale, ScrollText, Gauge, Filter, Download, Landmark,
 } from 'lucide-react';
 
 import { ADMIN_DICT } from './i18n/adminDict.js';
@@ -56,17 +57,17 @@ async function apiFetch(path, { method = 'GET', body, token } = {}) {
 }
 
 const C = {
-  bg: '#F7F5F1',
-  paper: '#F7F5F1',
+  bg: '#F3F5F9',
+  paper: '#F3F5F9',
   card: '#FFFFFF',
-  border: '#E4DED2',
-  ink: '#1C2321',
-  muted: '#6F6A5E',
+  border: '#E2E7EF',
+  ink: '#0F1B2D',
+  muted: '#5F6B7A',
   navy: '#0F2D52',
   navyDeep: '#0A2140',
   sky: '#2C8FB0',
   gold: '#B9862F',
-  mint: '#3D7A5C',
+  mint: '#1E9E7C',
   amber: '#B9862F',
   danger: '#B5482E',
   purple: '#6D3FD1',
@@ -467,6 +468,483 @@ function BusinessReview({ token }) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KONFÒMITE — Siveyans, Rekonsilyasyon, Jounal odit (sipè admin sèlman).
+// ---------------------------------------------------------------------------
+const RULE_LABELS = {
+  large_tx: 'Gwo montan',
+  velocity: 'Anpil operasyon an 24è',
+  rapid_cashout: 'Depo epi retrè rapid',
+  structuring: 'Montan jis anba papòt la',
+  unverified_inflow: 'Kont pa verifye k ap resevwa anpil',
+};
+const RULE_HELP = {
+  large_tx: 'Yon sèl operasyon ≥ {0}',
+  velocity: '≥ {0} retrè/transfè nan 24 è',
+  rapid_cashout: 'Retrè ≥ {0}% yon depo, nan 24 è apre l',
+  structuring: '≥ {0} operasyon ant {1} ak {2} nan 7 jou',
+  unverified_inflow: 'Kont pa verifye ki resevwa ≥ {0} an 7 jou',
+};
+const SEV_STYLE = { high: ['#FBEBE6', '#B5482E', 'Wo'], medium: ['#FBF0DE', '#8A6423', 'Mwayen'], low: ['#E6F0FB', '#143A73', 'Ba'] };
+const KIND_LABEL = { deposit: 'Depo@@one', withdrawal: 'Retrè@@one', transfer: 'Transfè@@one' };
+const STATUS_STYLE = { confirmed: ['#E4F5EF', '#1E7A5F', 'Konfime'], pending: ['#FBF0DE', '#8A6423', 'Ap tann'], rejected: ['#FBEBE6', '#B5482E', 'Rejte@@status'] };
+
+function fmtDateTime(d) {
+  return new Date(d).toLocaleString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function downloadCsv(filename, header, rows) {
+  const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+function PageHead({ icon: Icon, title, sub, right }) {
+  return (
+    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4" style={{ marginBottom: 20 }}>
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: C.navyDeep }}><Icon size={20} color={C.gold} /></div>
+        <div>
+          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24, color: C.ink }}>{title}</h1>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>{sub}</p>
+        </div>
+      </div>
+      {right}
+    </div>
+  );
+}
+
+function Pill({ bg, fg, children }) {
+  return <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full whitespace-nowrap" style={{ background: bg, color: fg }}>{children}</span>;
+}
+
+function ClientCell({ u }) {
+  if (!u) return <span style={{ color: C.muted }}>—</span>;
+  return (
+    <div>
+      <p className="font-semibold flex items-center gap-1" style={{ color: C.ink }}>{u.fullName}{u.verified ? <BadgeCheck size={13} color={C.sky} /> : null}</p>
+      <p className="text-[11px]" style={{ ...fontMono, color: C.muted }}>{u.clientId || u.phone || ''}</p>
+    </div>
+  );
+}
+
+// ------------------------------ SIVEYANS ------------------------------
+function MonitoringPage({ token, flash }) {
+  const [tab, setTab] = useState('alerts');
+  const [alerts, setAlerts] = useState([]);
+  const [counts, setCounts] = useState({});
+  const [rules, setRules] = useState(null);
+  const [alertFilter, setAlertFilter] = useState('open');
+  const [loading, setLoading] = useState(false);
+  const [reviewing, setReviewing] = useState(null); // { id, status }
+  const [note, setNote] = useState('');
+  const [tx, setTx] = useState([]);
+  const [totals, setTotals] = useState(null);
+  const [f, setF] = useState({ kind: 'all', status: 'all', days: 30, q: '', min: '' });
+
+  async function loadAlerts() {
+    setLoading(true);
+    try {
+      const r = await apiFetch(`/admin/monitoring/alerts?status=${alertFilter}`, { token });
+      setAlerts(r.alerts); setCounts(r.counts || {}); setRules(r.rules);
+    } catch (e) { flash(e.message); } finally { setLoading(false); }
+  }
+  async function loadTx() {
+    setLoading(true);
+    try {
+      const from = new Date(Date.now() - f.days * 86400000).toISOString();
+      const qs = new URLSearchParams({ from, kind: f.kind, status: f.status, q: f.q, min: f.min || '0' });
+      const r = await apiFetch(`/admin/monitoring/transactions?${qs}`, { token });
+      setTx(r.transactions); setTotals(r.totals);
+    } catch (e) { flash(e.message); } finally { setLoading(false); }
+  }
+  React.useEffect(() => { if (tab === 'alerts') loadAlerts(); }, [tab, alertFilter]);
+  React.useEffect(() => { if (tab === 'tx') loadTx(); }, [tab, f.kind, f.status, f.days]);
+
+  async function decide() {
+    try {
+      await apiFetch(`/admin/monitoring/alerts/${reviewing.id}`, { method: 'PATCH', token, body: { status: reviewing.status, note } });
+      flash(tt('Alèt la mete ajou.'));
+      setReviewing(null); setNote('');
+      loadAlerts();
+    } catch (e) { flash(e.message); }
+  }
+
+  function exportTx() {
+    downloadCsv(`blicpay-transactions-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Date', 'Type', 'Reference', 'Client', 'Client ID', 'Counterparty', 'Method', 'Amount HTG', 'Fee HTG', 'Status'],
+      tx.map((r) => [new Date(r.createdAt).toISOString(), r.kind, r.reference, r.user?.fullName, r.user?.clientId, r.counterparty?.fullName || '', r.method, r.amount, r.fee || 0, r.status]));
+  }
+
+  const ruleHelp = (k) => {
+    if (!rules) return '';
+    if (k === 'large_tx') return tt(RULE_HELP.large_tx, money(rules.LARGE_TX));
+    if (k === 'velocity') return tt(RULE_HELP.velocity, rules.VELOCITY_COUNT);
+    if (k === 'rapid_cashout') return tt(RULE_HELP.rapid_cashout, Math.round(rules.RAPID_CASHOUT_RATIO * 100));
+    if (k === 'structuring') return tt(RULE_HELP.structuring, rules.STRUCTURING_COUNT, money(rules.LARGE_TX * rules.STRUCTURING_MIN_RATIO), money(rules.LARGE_TX));
+    return tt(RULE_HELP.unverified_inflow, money(rules.UNVERIFIED_INFLOW));
+  };
+
+  return (
+    <div className="fadein">
+      <PageHead icon={ShieldAlert} title={tt('Siveyans tranzaksyon')} sub={tt('Alèt otomatik (AML) ak tout operasyon yo nan yon sèl kote — chak alèt dwe egzamine epi fèmen ak yon nòt.')}
+        right={<div className="flex p-1 rounded-full" style={{ background: '#EEF1F6' }}>
+          {[['alerts', tt('Alèt')], ['tx', tt('Tranzaksyon')]].map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)} className="px-4 py-1.5 rounded-full text-sm font-semibold" style={tab === id ? { background: '#fff', color: C.ink, boxShadow: '0 1px 3px rgba(0,0,0,.08)' } : { color: C.muted }}>
+              {label}{id === 'alerts' && counts.open ? <span className="ml-1.5 text-[10px] px-1.5 rounded-full text-white" style={{ background: C.danger }}>{counts.open}</span> : null}
+            </button>
+          ))}
+        </div>} />
+
+      {tab === 'alerts' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[['open', tt('Ouvè'), C.danger, AlertCircle], ['escalated', tt('Eskalade'), C.purple, ShieldAlert], ['reviewed', tt('Fèmen@@closed'), C.mint, Check]].map(([s, label, color, Icon]) => (
+              <button key={s} onClick={() => setAlertFilter(s)} className="bp-btn text-left bg-white rounded-xl p-4 flex items-center gap-3" style={{ border: `1px solid ${alertFilter === s ? color : C.border}` }}>
+                <span className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: `${color}18` }}><Icon size={17} color={color} /></span>
+                <div><p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{label}</p><p style={{ ...fontMono, fontSize: 20, fontWeight: 800 }}>{counts[s] || 0}</p></div>
+              </button>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-xl mt-4 overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+            {loading ? <p className="p-6 text-sm" style={{ color: C.muted }}>{tt('Ap chaje...')}</p> : alerts.length === 0 ? (
+              <div className="p-10 text-center"><Check size={28} color={C.mint} className="mx-auto" /><p className="text-sm mt-2" style={{ color: C.muted }}>{tt('Pa gen alèt nan kategori sa a.')}</p></div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead><tr><Th>{tt('Gravite')}</Th><Th>{tt('Règ')}</Th><Th>{tt('Kliyan')}</Th><Th align="right">{tt('Montan')}</Th><Th>{tt('Detay')}</Th><Th>{tt('Dat')}</Th><Th align="right">{tt('Aksyon')}</Th></tr></thead>
+                <tbody>
+                  {alerts.map((a) => {
+                    const [bg, fg, sev] = SEV_STYLE[a.severity] || SEV_STYLE.low;
+                    return (
+                      <React.Fragment key={a.id}>
+                        <tr>
+                          <Td><Pill bg={bg} fg={fg}>{tt(sev)}</Pill></Td>
+                          <Td><span className="font-semibold">{tt(RULE_LABELS[a.rule] || a.rule)}</span></Td>
+                          <Td><ClientCell u={a.user} /></Td>
+                          <Td align="right"><span className="whitespace-nowrap" style={{ ...fontMono, fontWeight: 700 }}>{a.amount != null ? money(a.amount) : '—'}</span></Td>
+                          <Td><span className="text-[11px]" style={{ ...fontMono, color: C.muted }}>{a.details?.reference || a.details?.references?.slice(0, 3).join(', ') || (a.details?.deposit ? `${a.details.deposit} → ${a.details.withdrawal}` : '')}</span></Td>
+                          <Td><span className="text-xs" style={{ color: C.muted }}>{fmtDateTime(a.createdAt)}</span></Td>
+                          <Td align="right">
+                            {a.status === 'open' ? (
+                              <div className="flex justify-end gap-1.5">
+                                <button onClick={() => { setReviewing({ id: a.id, status: 'reviewed' }); setNote(''); }} className="bp-btn px-2.5 py-1 rounded-md text-xs font-semibold text-white" style={{ background: C.mint }}>{tt('Fèmen alèt')}</button>
+                                <button onClick={() => { setReviewing({ id: a.id, status: 'escalated' }); setNote(''); }} className="bp-btn px-2.5 py-1 rounded-md text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.purple }}>{tt('Eskalade@@btn')}</button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px]" style={{ color: C.muted }} title={a.note || ''}>{a.status === 'reviewed' ? tt('Fèmen@@closed') : tt('Eskalade')} · {a.reviewedAt ? fmtDateTime(a.reviewedAt) : ''}</span>
+                            )}
+                          </Td>
+                        </tr>
+                        {reviewing?.id === a.id && (
+                          <tr><td colSpan={7} style={{ padding: '10px 14px', background: '#F7F9FC', borderTop: `1px solid ${C.border}` }}>
+                            <div className="flex flex-col md:flex-row gap-2">
+                              <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tt('Nòt obligatwa: kisa ou verifye, ki desizyon…')} className="flex-1 px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${C.border}` }} />
+                              <button onClick={decide} disabled={!note.trim()} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: C.navy }}>{reviewing.status === 'reviewed' ? tt('Konfime fèmti') : tt('Konfime eskalasyon')}</button>
+                              <button onClick={() => setReviewing(null)} className="px-3 py-2 rounded-lg text-sm" style={{ color: C.muted }}>{tt('Anile')}</button>
+                            </div>
+                          </td></tr>
+                        )}
+                        {a.note && reviewing?.id !== a.id && a.status !== 'open' && (
+                          <tr><td colSpan={7} style={{ padding: '0 14px 10px', fontSize: 12, color: C.muted }}>📝 {a.note}</td></tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className="bg-white rounded-xl mt-4 p-5" style={{ border: `1px solid ${C.border}` }}>
+            <p className="text-sm font-bold flex items-center gap-2"><Gauge size={16} color={C.navy} />{tt('Règ siveyans aktif')}</p>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3 mt-3">
+              {Object.keys(RULE_LABELS).map((k) => (
+                <div key={k} className="rounded-lg p-3" style={{ background: '#F7F9FC', border: `1px solid ${C.border}` }}>
+                  <p className="text-sm font-semibold">{tt(RULE_LABELS[k])}</p>
+                  <p className="text-xs mt-0.5" style={{ color: C.muted }}>{ruleHelp(k)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {tab === 'tx' && (
+        <>
+          <div className="bg-white rounded-xl p-4 flex flex-wrap gap-2 items-center" style={{ border: `1px solid ${C.border}` }}>
+            <select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })} className="px-3 py-2 rounded-lg text-sm bg-white" style={{ border: `1px solid ${C.border}` }}>
+              <option value="all">{tt('Tout tip')}</option><option value="deposit">{tt('Depo')}</option><option value="withdrawal">{tt('Retrè')}</option><option value="transfer">{tt('Transfè')}</option>
+            </select>
+            <select value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} className="px-3 py-2 rounded-lg text-sm bg-white" style={{ border: `1px solid ${C.border}` }}>
+              <option value="all">{tt('Tout estati')}</option><option value="confirmed">{tt('Konfime')}</option><option value="pending">{tt('Ap tann')}</option><option value="rejected">{tt('Rejte@@status')}</option>
+            </select>
+            <select value={f.days} onChange={(e) => setF({ ...f, days: Number(e.target.value) })} className="px-3 py-2 rounded-lg text-sm bg-white" style={{ border: `1px solid ${C.border}` }}>
+              {[7, 30, 90, 365].map((d) => <option key={d} value={d}>{tt('{0} dènye jou', d)}</option>)}
+            </select>
+            <input value={f.min} onChange={(e) => setF({ ...f, min: e.target.value.replace(/\D/g, '') })} placeholder={tt('Montan min.')} className="w-32 px-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${C.border}` }} />
+            <div className="relative flex-1 min-w-[200px]">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" color={C.muted} />
+              <input value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && loadTx()} placeholder={tt('Non, telefòn, ID oswa referans')} className="w-full pl-9 pr-3 py-2 rounded-lg text-sm" style={{ border: `1px solid ${C.border}` }} />
+            </div>
+            <button onClick={loadTx} className="bp-btn px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5" style={{ border: `1px solid ${C.border}` }}><Filter size={14} />{tt('Filtre')}</button>
+            <button onClick={exportTx} disabled={!tx.length} className="bp-btn px-3 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5 disabled:opacity-50" style={{ background: C.navy }}><Download size={14} />CSV</button>
+          </div>
+          {totals && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3">
+              {[[tt('Operasyon'), String(totals.count)], [tt('Depo konfime'), money(totals.deposits)], [tt('Retrè konfime'), money(totals.withdrawals)], [tt('Transfè'), money(totals.transfers)]].map(([l, v]) => (
+                <div key={l} className="bg-white rounded-xl p-4" style={{ border: `1px solid ${C.border}` }}>
+                  <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{l}</p>
+                  <p style={{ ...fontMono, fontSize: 18, fontWeight: 800, marginTop: 4 }}>{v}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="bg-white rounded-xl mt-3 overflow-x-auto" style={{ border: `1px solid ${C.border}` }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
+              <thead><tr><Th>{tt('Dat')}</Th><Th>{tt('Tip')}</Th><Th>{tt('Referans')}</Th><Th>{tt('Kliyan')}</Th><Th>{tt('Kontrepati')}</Th><Th>{tt('Metòd')}</Th><Th align="right">{tt('Montan')}</Th><Th>{tt('Estati')}</Th></tr></thead>
+              <tbody>
+                {loading ? <EmptyRow colSpan={8}>{tt('Ap chaje...')}</EmptyRow> : tx.length === 0 ? <EmptyRow colSpan={8}>{tt('Pa gen okenn rezilta.')}</EmptyRow> : tx.map((r) => {
+                  const [bg, fg, st] = STATUS_STYLE[r.status] || STATUS_STYLE.pending;
+                  return (
+                    <tr key={r.kind + r.id}>
+                      <Td><span className="text-xs whitespace-nowrap">{fmtDateTime(r.createdAt)}</span></Td>
+                      <Td><span className="font-semibold">{tt(KIND_LABEL[r.kind])}</span></Td>
+                      <Td><span className="text-[11px]" style={fontMono}>{r.reference}</span></Td>
+                      <Td><ClientCell u={r.user} /></Td>
+                      <Td>{r.counterparty ? <ClientCell u={r.counterparty} /> : <span style={{ color: C.muted }}>—</span>}</Td>
+                      <Td><span className="text-xs">{r.method === 'biwo' ? tt('Nan biwo') : r.method === 'blicpay' ? 'BLICPay' : r.method}{r.branch ? ` · ${r.branch}` : ''}</span></Td>
+                      <Td align="right"><span className="whitespace-nowrap" style={{ ...fontMono, fontWeight: 700 }}>{money(r.amount)}</span>{r.fee ? <p className="text-[10px]" style={{ color: C.muted }}>+{money(r.fee)}</p> : null}</Td>
+                      <Td><Pill bg={bg} fg={fg}>{tt(st)}</Pill></Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------ REKONSILYASYON ------------------------------
+function ReconciliationPage({ token, flash }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [value, setValue] = useState('');
+
+  async function load() {
+    setLoading(true);
+    try { setData(await apiFetch('/admin/reconciliation', { token })); } catch (e) { flash(e.message); } finally { setLoading(false); }
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function saveReserve(method) {
+    try {
+      await apiFetch(`/admin/reserves/${method}`, { method: 'PATCH', token, body: { balance: Number(value) } });
+      flash(tt('Rezèv la mete ajou.'));
+      setEditing(null);
+      load();
+    } catch (e) { flash(e.message); }
+  }
+
+  const ASSETS = [['moncash', tt('Kont operasyonèl MonCash')], ['natcash', tt('Kont operasyonèl NatCash')], ['bank', tt('Kont bank (fon kliyan)')], ['cash', tt('Kach nan biwo yo')]];
+  const LIABS = [['clientBalances', tt('Balans kliyan yo')], ['pockets', tt('Pòch (BLIC Depo)')], ['savingsGoals', tt('Objektif epay')], ['pendingWithdrawals', tt('Retrè annatant (poko voye)')]];
+  const ok = data && data.difference >= 0;
+  const coverage = data?.coverage != null ? Math.round(data.coverage * 1000) / 10 : null;
+
+  return (
+    <div className="fadein">
+      <PageHead icon={Scale} title={tt('Rekonsilyasyon fon')} sub={tt('Lajan kliyan yo dwe (pasif) konpare ak lajan BLICPay kenbe reyèlman (aktif).')}
+        right={<button onClick={load} className="bp-btn px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 bg-white" style={{ border: `1px solid ${C.border}` }}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />{tt('Rafrechi')}</button>} />
+      {!data ? <p className="text-sm" style={{ color: C.muted }}>{tt('Ap chaje...')}</p> : (
+        <>
+          <div className="rounded-2xl p-6 text-white relative overflow-hidden" style={{ background: ok ? 'linear-gradient(120deg, #0F5C47, #1E9E7C)' : 'linear-gradient(120deg, #7A2A18, #B5482E)' }}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {ok ? <ShieldCheck size={30} /> : <AlertCircle size={30} />}
+                <div>
+                  <p className="text-lg font-bold">{ok ? tt('Fon kliyan yo kouvri') : tt('Ekar — fon yo pa kouvri nèt')}</p>
+                  <p className="text-xs opacity-80">{tt('Kalkile {0}', fmtDateTime(data.asOf))} · {tt('{0} kliyan', data.clients)}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] uppercase tracking-widest opacity-80">{tt('Kouvèti')}</p>
+                <p style={{ ...fontMono, fontSize: 30, fontWeight: 800 }}>{coverage != null ? `${coverage}%` : '—'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-4 mt-4">
+            <div className="bg-white rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+              <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <p className="text-sm font-bold">{tt('Pasif — lajan kliyan yo')}</p><Users size={16} color={C.muted} />
+              </div>
+              {LIABS.map(([k, label]) => (
+                <div key={k} className="px-5 py-3 flex justify-between text-sm" style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <span>{label}</span><span style={{ ...fontMono, fontWeight: 700 }}>{money(data.liabilities[k])}</span>
+                </div>
+              ))}
+              <div className="px-5 py-3.5 flex justify-between text-sm font-bold" style={{ background: '#F7F9FC' }}>
+                <span>{tt('Total pasif')}</span><span style={fontMono}>{money(data.totalLiabilities)}</span>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+              <div className="px-5 py-3 flex justify-between items-center" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <p className="text-sm font-bold">{tt('Aktif — lajan BLICPay kenbe')}</p><Landmark size={16} color={C.muted} />
+              </div>
+              {ASSETS.map(([m, label]) => {
+                const r = data.reserves.find((x) => x.method === m);
+                return (
+                  <div key={m} className="px-5 py-3 flex justify-between items-center text-sm gap-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <div>
+                      <p>{label}</p>
+                      <p className="text-[10px]" style={{ color: C.muted }}>{r?.updatedAt ? tt('Mete ajou {0}', fmtDateTime(r.updatedAt)) : tt('Poko antre')}</p>
+                    </div>
+                    {editing === m ? (
+                      <div className="flex gap-1.5">
+                        <input autoFocus value={value} onChange={(e) => setValue(e.target.value.replace(/\D/g, ''))} className="w-32 px-2 py-1 rounded-md text-sm text-right" style={{ ...fontMono, border: `1px solid ${C.border}` }} />
+                        <button onClick={() => saveReserve(m)} className="px-2.5 py-1 rounded-md text-xs font-semibold text-white" style={{ background: C.navy }}>{tt('Anrejistre')}</button>
+                        <button onClick={() => setEditing(null)} className="px-1.5 text-xs" style={{ color: C.muted }}><X size={14} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setEditing(m); setValue(String(data.assets[m] || '')); }} className="flex items-center gap-2 group" title={tt('Modifye')}>
+                        <span style={{ ...fontMono, fontWeight: 700 }}>{money(data.assets[m])}</span>
+                        <KeyRound size={12} color={C.muted} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="px-5 py-3.5 flex justify-between text-sm font-bold" style={{ background: '#F7F9FC' }}>
+                <span>{tt('Total aktif')}</span><span style={fontMono}>{money(data.totalAssets)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl mt-4 px-5 py-4 flex flex-col md:flex-row justify-between gap-3" style={{ border: `1px solid ${ok ? C.border : C.danger}` }}>
+            <div>
+              <p className="text-sm font-bold">{tt('Ekar (aktif − pasif)')}</p>
+              <p className="text-xs" style={{ color: C.muted }}>{tt('Pozitif = BLICPay kenbe plis pase sa li dwe. Negatif = mank pou eksplike.')}</p>
+            </div>
+            <p style={{ ...fontMono, fontSize: 22, fontWeight: 800, color: ok ? C.mint : C.danger }}>{data.difference >= 0 ? '+' : '−'}{money(Math.abs(data.difference))}</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-3 mt-4 text-sm">
+            <div className="bg-white rounded-xl p-4" style={{ border: `1px solid ${C.border}` }}>
+              <p className="font-semibold">{tt('Depo annatant')}</p>
+              <p className="text-xs mt-1" style={{ color: C.muted }}>{tt('{0} depo · {1} — poko konte nan pasif la jiskaske yo konfime.', data.pending.depositsCount, money(data.pending.depositsAmount))}</p>
+            </div>
+            <div className="bg-white rounded-xl p-4" style={{ border: `1px solid ${C.border}` }}>
+              <p className="font-semibold">{tt('Retrè annatant')}</p>
+              <p className="text-xs mt-1" style={{ color: C.muted }}>{tt('{0} retrè — deja retire nan balans kliyan yo, men lajan an poko soti.', data.pending.withdrawalsCount)}</p>
+            </div>
+          </div>
+          <p className="text-xs mt-4" style={{ color: C.muted }}>{tt('Metòd: rezèv yo antre alamen apre chak verifikasyon kont MonCash, NatCash, bank ak kès biwo yo. Rekonsilyasyon an dwe fèt omwen chak jou.')}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ------------------------------ JOUNAL ODIT ------------------------------
+const AUDIT_ACTIONS = [
+  [/^LOGIN/, 'Koneksyon'],
+  [/^POST \/deposits\/:id\/confirm/, 'Konfime depo@@audit'],
+  [/^POST \/deposits\/:id\/reject/, 'Rejte depo'],
+  [/^POST \/withdrawals\/:id\/confirm/, 'Konfime retrè@@audit'],
+  [/^POST \/withdrawals\/:id\/reject/, 'Rejte retrè'],
+  [/\/users\/:id\/block/, 'Bloke / debloke kont'],
+  [/\/users\/:id\/verify/, 'Chanje verifikasyon kont'],
+  [/\/users\/:id\/adjust-balance/, 'Ajiste balans'],
+  [/\/kyc\/(didit\/)?:id\/approve/, 'Apwouve KYC'],
+  [/\/kyc\/(didit\/)?:id\/reject/, 'Rejte KYC'],
+  [/\/kyc\/didit\/:id\/refresh/, 'Rafrechi rapò KYC'],
+  [/\/businesses\/:id\/approve/, 'Apwouve antrepriz'],
+  [/\/businesses\/:id\/reject/, 'Refize antrepriz'],
+  [/\/businesses\/:id\/request-info/, 'Mande enfòmasyon antrepriz'],
+  [/\/businesses\/:id\/documents/, 'Desizyon sou dokiman antrepriz'],
+  [/\/verification-requests/, 'Demand dokiman siplemantè'],
+  [/^POST \/agents$/, 'Kreye ajan'],
+  [/^(PATCH|PUT) \/agents/, 'Modifye ajan@@audit'],
+  [/^DELETE \/agents/, 'Efase ajan'],
+  [/^POST \/branches$/, 'Kreye siikisal'],
+  [/^(PATCH|PUT) \/branches/, 'Modifye siikisal@@audit'],
+  [/^DELETE \/branches/, 'Efase siikisal'],
+  [/\/reserves\/:method/, 'Mete rezèv ajou'],
+  [/\/monitoring\/alerts/, 'Desizyon sou alèt'],
+  [/\/support/, 'Mesaj sipò'],
+];
+function auditAction(l) {
+  const key = `${l.method} ${l.route || l.path.replace(/^\/admin/, '')}`;
+  const hit = AUDIT_ACTIONS.find(([re]) => re.test(key));
+  return hit ? tt(hit[1]) : `${l.method} ${l.path}`;
+}
+
+function AuditPage({ token, flash }) {
+  const [logs, setLogs] = useState([]);
+  const [q, setQ] = useState('');
+  const [days, setDays] = useState(30);
+  const [open, setOpen] = useState(null);
+  const [loading, setLoading] = useState(false);
+  async function load() {
+    setLoading(true);
+    try {
+      const from = new Date(Date.now() - days * 86400000).toISOString();
+      const r = await apiFetch(`/admin/audit?from=${from}&q=${encodeURIComponent(q)}`, { token });
+      setLogs(r.logs);
+    } catch (e) { flash(e.message); } finally { setLoading(false); }
+  }
+  React.useEffect(() => { load(); }, [days]);
+  function exportCsv() {
+    downloadCsv(`blicpay-audit-${new Date().toISOString().slice(0, 10)}.csv`, ['Date', 'Actor', 'Role', 'Action', 'Method', 'Path', 'Target', 'IP', 'Details'],
+      logs.map((l) => [new Date(l.createdAt).toISOString(), l.actorName, l.actorRole, auditAction(l), l.method, l.path, l.targetId, l.ip, l.details ? JSON.stringify(l.details) : '']));
+  }
+  return (
+    <div className="fadein">
+      <PageHead icon={ScrollText} title={tt('Jounal odit')} sub={tt('Chak aksyon admin ak ajan anrejistre otomatikman — kiyès, kisa, kilè, ki kote. Jounal la pa ka modifye ni efase.')}
+        right={<div className="flex gap-2">
+          <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="px-3 py-2 rounded-lg text-sm bg-white" style={{ border: `1px solid ${C.border}` }}>
+            {[7, 30, 90].map((d) => <option key={d} value={d}>{tt('{0} dènye jou', d)}</option>)}
+          </select>
+          <button onClick={exportCsv} disabled={!logs.length} className="bp-btn px-3 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5 disabled:opacity-50" style={{ background: C.navy }}><Download size={14} />CSV</button>
+        </div>} />
+      <div className="relative mb-3">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" color={C.muted} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} placeholder={tt('Chèche yon moun oswa yon aksyon')} className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm bg-white" style={{ border: `1px solid ${C.border}` }} />
+      </div>
+      <div className="bg-white rounded-xl overflow-x-auto" style={{ border: `1px solid ${C.border}` }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 820 }}>
+          <thead><tr><Th>{tt('Dat ak lè')}</Th><Th>{tt('Kiyès')}</Th><Th>{tt('Aksyon')}</Th><Th>{tt('Sib')}</Th><Th>IP</Th><Th align="right">{tt('Detay')}</Th></tr></thead>
+          <tbody>
+            {loading ? <EmptyRow colSpan={6}>{tt('Ap chaje...')}</EmptyRow> : logs.length === 0 ? <EmptyRow colSpan={6}>{tt('Pa gen aksyon anrejistre pou peryòd sa a.')}</EmptyRow> : logs.map((l) => (
+              <React.Fragment key={l.id}>
+                <tr>
+                  <Td><span className="text-xs whitespace-nowrap" style={fontMono}>{fmtDateTime(l.createdAt)}</span></Td>
+                  <Td><p className="font-semibold">{l.actorName || '—'}</p><p className="text-[11px]" style={{ color: C.muted }}>{l.actorRole === 'agent' ? tt('Ajan@@one') : tt('Admin')}</p></Td>
+                  <Td><span className="font-semibold" style={{ color: l.method === 'DELETE' ? C.danger : C.ink }}>{auditAction(l)}</span></Td>
+                  <Td><span className="text-[11px]" style={{ ...fontMono, color: C.muted }}>{l.targetId ? `…${l.targetId.slice(-8)}` : '—'}</span></Td>
+                  <Td><span className="text-[11px]" style={{ ...fontMono, color: C.muted }}>{l.ip || '—'}</span></Td>
+                  <Td align="right">{l.details ? <button onClick={() => setOpen(open === l.id ? null : l.id)} className="text-xs font-semibold" style={{ color: C.navy }}>{open === l.id ? tt('Kache') : tt('Wè')}</button> : <span style={{ color: C.muted }}>—</span>}</Td>
+                </tr>
+                {open === l.id && (
+                  <tr><td colSpan={6} style={{ padding: '8px 14px 12px', background: '#F7F9FC' }}><pre className="text-[11px] whitespace-pre-wrap" style={fontMono}>{JSON.stringify(l.details, null, 2)}</pre></td></tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -1164,7 +1642,7 @@ export default function BlicPayAdmin() {
       setAdmin(user);
       setNav(user.role === 'agent' ? 'pending' : 'overview');
       await loadPending(newToken);
-      if (user.role !== 'agent') { loadExchangeRate(newToken); loadFinance('all', newToken); loadReserves(newToken); }
+      if (user.role !== 'agent') { loadExchangeRate(newToken); loadFinance('all', newToken); loadReserves(newToken); loadRecon(newToken); loadAlertCount(newToken); }
       loadNotifications(newToken);
     } catch (err) {
       setLoginError(err.message);
@@ -1313,23 +1791,34 @@ export default function BlicPayAdmin() {
   const totalLoansActive = loans.filter((l) => l.status === 'active').reduce((s, l) => s + l.amount, 0);
   const pendingLoansCount = loans.filter((l) => l.status === 'pending').length;
 
+  // Rezime konfòmite pou Apèsi a (rekonsilyasyon + alèt ouvè).
+  const [recon, setRecon] = useState(null);
+  const [openAlerts, setOpenAlerts] = useState(0);
+  async function loadRecon(authToken = token) {
+    try { setRecon(await apiFetch('/admin/reconciliation', { token: authToken })); } catch { /* pa bloke apèsi a */ }
+  }
+  async function loadAlertCount(authToken = token) {
+    try { const r = await apiFetch('/admin/monitoring/alerts?status=open', { token: authToken }); setOpenAlerts(r.counts?.open || 0); } catch { /* pa bloke apèsi a */ }
+  }
+
+  // Meni an òganize pa seksyon (Jeneral, Operasyon, Konfòmite, Administrasyon).
   const NAV_ITEMS_ALL = [
-    { id: 'overview', label: tt("Apèsi"), icon: LayoutGrid, onOpen: () => { loadExchangeRate(); loadFinance('all'); loadReserves(); }, adminOnly: true },
-    { id: 'finance', label: tt("Finans"), icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
-    { id: 'pending', label: tt("Depo"), icon: Wallet, count: pending.length },
-    { id: 'withdrawals', label: tt("Retrait"), icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
-    { id: 'goals', label: tt("Depo Objektif"), icon: PiggyBank, onOpen: () => loadGoals(), adminOnly: true },
-    { id: 'loans', label: tt("Prè"), icon: HandCoins, count: pendingLoansCount, onOpen: () => loadLoans(), adminOnly: false },
-    { id: 'transfers', label: tt("Transfè"), icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
-    { id: 'sol', label: tt("BLIC Sòl"), icon: Users, count: solRequests.length, onOpen: () => loadSol(), adminOnly: false },
-    { id: 'solPayouts', label: tt("Pòch Sòl resevwa"), icon: HandCoins, onOpen: () => loadSolPayouts(), adminOnly: false },
-    { id: 'business', label: tt("Antrepriz"), icon: Building2, adminOnly: true },
-    { id: 'kyc', label: tt("Verifikasyon KYC"), icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
-    { id: 'verificationRequests', label: tt("Dokiman Siplemantè"), icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
-    { id: 'support', label: tt("Mesaj Sipò"), icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
-    { id: 'users', label: tt("Itilizatè"), icon: User, onOpen: () => loadUsers(), adminOnly: true },
-    { id: 'agents', label: tt("Ajan"), icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
+    { id: 'overview', section: 'general', label: tt("Apèsi"), icon: LayoutGrid, onOpen: () => { loadExchangeRate(); loadFinance('all'); loadReserves(); loadRecon(); loadAlertCount(); }, adminOnly: true },
+    { id: 'finance', section: 'general', label: tt("Finans"), icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
+    { id: 'pending', section: 'ops', label: tt("Depo"), icon: Wallet, count: pending.length },
+    { id: 'withdrawals', section: 'ops', label: tt("Retrait"), icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
+    { id: 'transfers', section: 'ops', label: tt("Transfè"), icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
+    { id: 'support', section: 'ops', label: tt("Mesaj Sipò"), icon: Mail, count: supportMessages.length, onOpen: () => loadSupportMessages(), adminOnly: true },
+    { id: 'monitoring', section: 'compliance', label: tt("Siveyans & alèt"), icon: ShieldAlert, count: openAlerts, adminOnly: true },
+    { id: 'kyc', section: 'compliance', label: tt("Verifikasyon KYC"), icon: ShieldCheck, count: kycSubmissions.length, onOpen: () => loadKyc(), adminOnly: true },
+    { id: 'business', section: 'compliance', label: tt("Antrepriz (KYB)"), icon: Building2, adminOnly: true },
+    { id: 'verificationRequests', section: 'compliance', label: tt("Dokiman Siplemantè"), icon: FileText, count: vrPending.length, onOpen: () => loadVerificationRequests(), adminOnly: true },
+    { id: 'reconciliation', section: 'compliance', label: tt("Rekonsilyasyon"), icon: Scale, adminOnly: true },
+    { id: 'audit', section: 'compliance', label: tt("Jounal odit"), icon: ScrollText, adminOnly: true },
+    { id: 'users', section: 'admin', label: tt("Itilizatè"), icon: User, onOpen: () => loadUsers(), adminOnly: true },
+    { id: 'agents', section: 'admin', label: tt("Ajan"), icon: UserPlus, onOpen: () => loadAgents(), adminOnly: true },
   ];
+  const NAV_SECTIONS = [['general', tt("Jeneral")], ['ops', tt("Operasyon")], ['compliance', tt("Konfòmite")], ['admin', tt("Administrasyon")]];
   const NAV_ITEMS = NAV_ITEMS_ALL.filter((item) => !item.adminOnly || admin?.role === 'admin');
 
   function goTo(item) {
@@ -1386,7 +1875,7 @@ export default function BlicPayAdmin() {
   }
 
   return (
-    <div style={{ background: C.bg, minHeight: '100%', color: C.ink }} className="w-full">
+    <div style={{ background: C.bg, minHeight: '100%', color: C.ink }} className="w-full adm-shell">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
         * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
@@ -1398,7 +1887,52 @@ export default function BlicPayAdmin() {
         @keyframes fadein { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:translateY(0);} }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .fadein { animation: fadein .3s ease; }
+        .adm-side { display: none; }
+        @media (min-width: 1024px) {
+          .adm-shell { padding-left: 248px; }
+          .adm-side { display: flex; }
+          .adm-topnav { display: none !important; }
+          .adm-hide-lg { display: none !important; }
+        }
+        .adm-link { transition: background .15s ease, color .15s ease; }
+        .adm-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
       `}</style>
+
+      {/* Meni lateral (gwo ekran) — seksyon: Jeneral, Operasyon, Konfòmite, Administrasyon */}
+      <aside className="adm-side flex-col" style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 248, zIndex: 35, background: C.navyDeep, borderRight: '1px solid #0F2D52' }}>
+        <div className="flex items-center gap-2.5" style={{ padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div className="rounded-lg flex items-center justify-center font-extrabold text-white" style={{ width: 32, height: 32, background: C.navy, border: `1px solid ${C.gold}` }}>B</div>
+          <div>
+            <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', lineHeight: 1.1 }}>BLIC<span style={{ color: C.gold }}>Pay</span></p>
+            <p className="text-[10px] uppercase tracking-widest" style={{ color: '#7a8aa3' }}>{tt("Konsòl operasyon")}</p>
+          </div>
+        </div>
+        <nav className="flex-1 overflow-y-auto" style={{ padding: '10px 12px 16px' }}>
+          {NAV_SECTIONS.map(([sec, label]) => {
+            const items = NAV_ITEMS.filter((it) => it.section === sec);
+            if (!items.length) return null;
+            return (
+              <div key={sec} style={{ marginTop: 14 }}>
+                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6E7F99', padding: '0 10px 6px' }}>{label}</p>
+                {items.map((item) => {
+                  const on = nav === item.id;
+                  return (
+                    <button key={item.id} onClick={() => goTo(item)} className="adm-link w-full flex items-center gap-2.5 rounded-lg text-sm"
+                      style={{ padding: '8px 10px', marginBottom: 2, fontWeight: on ? 700 : 500, color: on ? '#fff' : 'rgba(255,255,255,0.68)', background: on ? 'rgba(185,134,47,0.18)' : 'transparent', boxShadow: on ? `inset 3px 0 0 ${C.gold}` : 'none' }}>
+                      <item.icon size={16} color={on ? C.gold : 'currentColor'} />
+                      <span className="flex-1 text-left">{item.label}</span>
+                      {item.count > 0 && <span className="text-[10px] font-bold rounded-full" style={{ padding: '1px 7px', background: sec === 'compliance' ? C.danger : 'rgba(255,255,255,0.16)', color: '#fff' }}>{item.count}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </nav>
+        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <p className="text-[10px]" style={{ color: '#6E7F99' }}>{tt("Aksè anrejistre nan jounal odit la")}</p>
+        </div>
+      </aside>
 
       {toast && (
         <div className="fixed top-4 right-4 z-50 fadein px-4 py-3 rounded-xl text-sm flex items-center gap-2 shadow-lg"
@@ -1411,7 +1945,7 @@ export default function BlicPayAdmin() {
       <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep, borderBottom: '1px solid #0F2D52', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
         <div className="flex items-center justify-between" style={{ padding: '9px 24px', borderBottom: '1px solid rgba(19,44,80,0.6)' }}>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2.5">
+            <div className="adm-hide-lg flex items-center gap-2.5">
               <div className="rounded-lg flex items-center justify-center font-extrabold text-white" style={{ width: 30, height: 30, background: C.navy, border: `1px solid ${C.gold}` }}>B</div>
               <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', letterSpacing: -0.2 }}>
                 {tt("BLIC")}<span style={{ color: C.gold }}>{tt("Pay")}</span>
@@ -1470,7 +2004,7 @@ export default function BlicPayAdmin() {
             </button>
           </div>
         </div>
-        <div className="flex items-center flex-wrap" style={{ padding: '0 20px', gap: 2 }}>
+        <div className="adm-topnav flex items-center overflow-x-auto" style={{ padding: '0 12px', gap: 2 }}>
           {NAV_ITEMS.map((item) => (
             <button key={item.id} onClick={() => goTo(item)}
               className="nav-item flex items-center gap-1.5 text-sm rounded-t"
@@ -1543,12 +2077,12 @@ export default function BlicPayAdmin() {
           {nav === 'overview' && (() => {
             const totalDeposit = financeData?.totalDepositVolume ?? 0;
             const totalWithdrawal = financeData?.totalWithdrawalVolume ?? 0;
-            const solFundTotal = (financeData?.solGroups || []).reduce((s, g) => s + g.potential, 0);
-            const loanOutstanding = financeData?.digitalProducts?.loans?.totalOutstanding ?? 0;
             const moncashReserve = reserves.find((r) => r.method === 'moncash')?.balance || 0;
             const natcashReserve = reserves.find((r) => r.method === 'natcash')?.balance || 0;
             const totalReserve = moncashReserve + natcashReserve;
-            const totalBalance = totalDeposit + totalGoalsSaved + totalTransferVolume;
+            // Fon kliyan yo = sa BLICPay dwe kliyan li yo (rekonsilyasyon), pa yon sòm volim.
+            const totalBalance = recon?.totalLiabilities ?? 0;
+            const coveragePct = recon?.coverage != null ? Math.round(recon.coverage * 1000) / 10 : null;
             return (
             <div className="fadein">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -1566,7 +2100,7 @@ export default function BlicPayAdmin() {
               <div className="rounded-2xl p-6 text-white relative overflow-hidden" style={{ marginTop: 18, background: `linear-gradient(120deg, ${C.navyDeep}, ${C.navy} 60%, #133863)`, border: `1px solid ${C.navy}` }}>
                 <div style={{ position: 'absolute', right: -60, top: -60, width: 280, height: 280, borderRadius: '50%', background: 'rgba(185,134,47,0.10)', filter: 'blur(50px)', pointerEvents: 'none' }} />
                 <div className="relative">
-                  <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>{tt("Balans Total Tout Pwodwi BLICPay")}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>{tt("Fon kliyan yo (total balans)")}</p>
                   <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 6 }}>
                     <span style={{ ...fontMono, fontSize: 34, fontWeight: 800, color: '#fff' }}>{money(totalBalance)}</span>
                     {exchangeRate && (
@@ -1585,17 +2119,17 @@ export default function BlicPayAdmin() {
                       <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(totalDeposit)}</p>
                     </div>
                     <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Fon BLIC Sòl Potansyèl")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(solFundTotal)}</p>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Kliyan aktif")}</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{recon?.clients ?? '—'}</p>
                     </div>
                     <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Pòtfèy Prè Ankou")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(loanOutstanding)}</p>
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Fon BLICPay kenbe")}</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: C.gold, marginTop: 3 }}>{money(recon?.totalAssets ?? totalReserve)}</p>
                     </div>
-                    <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Rezèv MonCash+NatCash")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: C.gold, marginTop: 3 }}>{money(totalReserve)}</p>
-                    </div>
+                    <button onClick={() => setNav('reconciliation')} className="text-left">
+                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Kouvèti fon kliyan")}</p>
+                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: coveragePct == null ? '#fff' : coveragePct >= 100 ? '#7EE2BF' : '#FFB4A2', marginTop: 3 }}>{coveragePct != null ? `${coveragePct}%` : '—'}</p>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1605,7 +2139,7 @@ export default function BlicPayAdmin() {
                 {[
                   { label: tt("Depo Ap Tann Validasyon"), value: tt("{0} demann", pending.length), sub: money(totalPendingAmount), tone: '#8A6423', bg: '#FBF0DE', tab: 'pending' },
                   { label: tt("Demann Retrè Ap Tann"), value: tt("{0} demann", withdrawals.length), sub: money(totalWithdrawAmount), tone: C.danger, bg: '#FBEBE6', tab: 'withdrawals' },
-                  { label: tt("Aderans BLIC Sòl"), value: tt("{0} demann", solRequests.length), sub: tt("ap tann apwobasyon"), tone: C.purple, bg: '#F4EBFF', tab: 'sol' },
+                  { label: tt("Alèt siveyans ouvè"), value: String(openAlerts), sub: tt("pou egzamine"), tone: C.purple, bg: '#F4EBFF', tab: 'monitoring' },
                   { label: tt("Dosye KYC Pou Tcheke"), value: tt("{0} dosye", kycSubmissions.length), sub: tt("ap tann egzamen"), tone: C.navy, bg: '#E6F0FB', tab: 'kyc' },
                 ].map((c) => (
                   <button key={c.label} onClick={() => setNav(c.tab)} className="bp-btn text-left bg-white rounded-xl" style={{ padding: 16, border: `1px solid ${C.border}` }}>
@@ -2381,6 +2915,9 @@ export default function BlicPayAdmin() {
           )}
 
           {nav === 'business' && <BusinessReview token={token} />}
+          {nav === 'monitoring' && <MonitoringPage token={token} flash={flash} />}
+          {nav === 'reconciliation' && <ReconciliationPage token={token} flash={flash} />}
+          {nav === 'audit' && <AuditPage token={token} flash={flash} />}
 
           {nav === 'kyc' && (
             <div className="fadein">
@@ -3062,11 +3599,11 @@ export default function BlicPayAdmin() {
                 {admin?.role !== 'agent' && (
                 <div className="rounded-2xl flex flex-col items-center text-center" style={{ padding: '20px 16px', background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#F4EBFF', marginBottom: 10 }}>
-                    <Users size={16} color={C.purple} />
+                    <ArrowLeftRight size={16} color={C.purple} />
                   </div>
-                  <p className="text-xs" style={{ color: C.muted }}>{tt("Volim Sòl aktif")}</p>
+                  <p className="text-xs" style={{ color: C.muted }}>{tt("Volim transfè")}</p>
                   <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 20, color: C.gold, marginTop: 4 }}>
-                    {money((financeData.solGroups || []).reduce((s, g) => s + g.potential, 0))}
+                    {money(totalTransferVolume)}
                   </p>
                 </div>
                 )}
@@ -3110,72 +3647,10 @@ export default function BlicPayAdmin() {
 
               {admin?.role !== 'agent' && (
               <>
-              {/* Pwodwi 100% dijital — pa gen siikisal ki enplike */}
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>{tt("Pwodwi dijital (tout kliyan, san siikisal)")}</p>
-              <div className="grid grid-cols-1 sm:grid-cols-3" style={{ gap: 12 }}>
-                <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E6F0FB', marginBottom: 10 }}>
-                    <Wallet size={16} color={C.navy} />
-                  </div>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt("BLIC Depo")}</p>
-                  <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.pockets.totalBalance)}</p>
-                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.pockets.activeCount} {tt("pòch aktif")}</p>
-                </div>
-                <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#E4F5EF', marginBottom: 10 }}>
-                    <PiggyBank size={16} color={C.mint} />
-                  </div>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt("Depo ak objektif")}</p>
-                  <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.goals.totalSaved)}</p>
-                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.goals.activeCount} {tt("aktif ·")} {financeData.digitalProducts.goals.completedCount} {tt("rive")}</p>
-                </div>
-                <div className="rounded-xl flex flex-col items-center text-center" style={{ padding: 18, background: C.card, border: `1px solid ${C.border}` }}>
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ background: '#FBEEDF', marginBottom: 10 }}>
-                    <HandCoins size={16} color={C.gold} />
-                  </div>
-                  <p className="text-xs font-semibold" style={{ color: C.muted }}>{tt("Prè")}</p>
-                  <p className="text-lg font-bold" style={{ ...fontMono, color: C.ink, marginTop: 4 }}>{money(financeData.digitalProducts.loans.totalOutstanding)}</p>
-                  <p className="text-xs" style={{ color: C.muted, marginTop: 2 }}>{financeData.digitalProducts.loans.activeCount} {tt("prè aktif")}</p>
-                </div>
-              </div>
-
-              {/* Volim pa gwoup Sòl */}
-              <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>{tt("Volim pa gwoup Sòl")}</p>
-              {(!financeData.solGroups || financeData.solGroups.length === 0) ? (
-                <div className="flex flex-col items-center text-center rounded-xl" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '32px 24px' }}>
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: C.bg, marginBottom: 12 }}>
-                    <Users size={18} color={C.muted} />
-                  </div>
-                  <p className="text-sm" style={{ color: C.muted }}>{tt("Pa gen okenn gwoup Sòl ak manm apwouve toujou.")}</p>
-                </div>
-              ) : (
-                <div className="flex flex-col" style={{ gap: 10 }}>
-                  {financeData.solGroups.map((g) => {
-                    const pct = g.potential > 0 ? Math.round((g.collected / g.potential) * 100) : 0;
-                    return (
-                      <div key={g.name} className="rounded-xl" style={{ padding: '14px 18px', background: C.card, border: `1px solid ${C.border}` }}>
-                        <div className="flex items-center justify-between flex-wrap gap-2" style={{ marginBottom: 8 }}>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold" style={{ color: C.ink }}>{g.name}</p>
-                            <Badge tone="muted">{g.memberCount}/{g.maxMembers} {tt("manm")}</Badge>
-                          </div>
-                          <p className="text-xs font-semibold" style={{ ...fontMono, color: C.muted }}>{money(g.collected)} / {money(g.potential)}</p>
-                        </div>
-                        <div className="rounded-full overflow-hidden" style={{ height: 6, background: '#F0EDE4' }}>
-                          <div style={{ width: `${pct}%`, height: '100%', background: C.mint }} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
               {/* Revni pa sous (egzistan deja) */}
               <p className="text-sm font-semibold" style={{ color: C.ink, marginTop: 24, marginBottom: 10 }}>{tt("Revni pa sous")}</p>
               <div className="rounded-lg" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                 {[
-                  { label: tt("Frè entegrasyon Sòl"), sub: tt("1,5% sou pot total"), value: financeData.breakdown.solIntegrationFees, accent: C.navy },
-                  { label: tt("Penalite reta Sòl"), sub: tt("Kotizasyon an reta"), value: financeData.breakdown.solPenalties, accent: '#8A6423' },
                   { label: tt("Frè retrè"), sub: tt("1,25% sou lajan elektwonik"), value: financeData.breakdown.withdrawalFees, accent: C.mint },
                 ].map((row, i) => (
                   <div key={row.label} className="flex items-center justify-between" style={{ padding: '15px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
