@@ -1593,6 +1593,15 @@ export default function BlicPayAdmin() {
     } catch (err) { flash(err.message); }
   }
 
+  async function toggleBeta(u) {
+    try {
+      await apiFetch(`/admin/users/${u.id}/beta`, { method: 'PATCH', token, body: { betaAccess: !u.betaAccess } });
+      setUsers((us) => us.map((x) => x.id === u.id ? { ...x, betaAccess: !u.betaAccess } : x));
+      if (selectedUser?.id === u.id) setSelectedUser((s) => ({ ...s, betaAccess: !u.betaAccess }));
+      flash(!u.betaAccess ? tt("Aksè tès bay.") : tt("Aksè tès retire."));
+    } catch (err) { flash(err.message); }
+  }
+
   async function toggleVerify(u) {
     try {
       await apiFetch(`/admin/users/${u.id}/verify`, { method: 'PATCH', token, body: { verified: !u.verified } });
@@ -1642,7 +1651,7 @@ export default function BlicPayAdmin() {
       setAdmin(user);
       setNav(user.role === 'agent' ? 'pending' : 'overview');
       await loadPending(newToken);
-      if (user.role !== 'agent') { loadExchangeRate(newToken); loadFinance('all', newToken); loadReserves(newToken); loadRecon(newToken); loadAlertCount(newToken); }
+      if (user.role !== 'agent') { loadExchangeRate(newToken); loadFinance('all', newToken); loadReserves(newToken); loadRecon(newToken); loadAlertCount(newToken); loadAccessMode(newToken); }
       loadNotifications(newToken);
     } catch (err) {
       setLoginError(err.message);
@@ -1794,6 +1803,10 @@ export default function BlicPayAdmin() {
   // Rezime konfòmite pou Apèsi a (rekonsilyasyon + alèt ouvè).
   const [recon, setRecon] = useState(null);
   const [openAlerts, setOpenAlerts] = useState(0);
+  const [privateBeta, setPrivateBeta] = useState(false);
+  async function loadAccessMode(authToken = token) {
+    try { const r = await apiFetch('/admin/access-mode', { token: authToken }); setPrivateBeta(!!r.privateBeta); } catch { /* ansyen sèvè */ }
+  }
   async function loadRecon(authToken = token) {
     try { setRecon(await apiFetch('/admin/reconciliation', { token: authToken })); } catch { /* pa bloke apèsi a */ }
   }
@@ -3243,6 +3256,15 @@ export default function BlicPayAdmin() {
             <div className="fadein">
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24 }}>{tt("Itilizatè")}</h1>
               <p className="text-sm mt-1" style={{ color: C.muted }}>{tt("Klike sou yon kliyan pou wè detay ak istorik li.")}</p>
+              {privateBeta && (
+                <div className="mt-4 p-4 rounded-xl flex items-start gap-3" style={{ background: '#FFF8E6', border: '1px solid #F2D58A' }}>
+                  <Lock size={16} color="#8A6100" style={{ marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: '#5C4100' }}>{tt("Mòd tès prive aktif")}</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#7A5A10' }}>{tt("Sèlman admin, ajan ak kont ki gen « Aksè tès » ka konekte nan app la ak sit la. Lòt moun ka kreye kont men yo pa ka antre.")}</p>
+                  </div>
+                </div>
+              )}
 
               <div className="mt-4 relative" style={{ maxWidth: 320 }}>
                 <Search size={14} color={C.muted} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }} />
@@ -3271,7 +3293,7 @@ export default function BlicPayAdmin() {
                           <Td><span style={fontMono} className="text-xs">{u.clientId || '—'}</span></Td>
                           <Td align="right"><span className="font-semibold">{money(u.balance)}</span></Td>
                           <Td align="center"><Badge tone={u.verified ? 'mint' : 'amber'}>{u.verified ? tt("Wi") : tt("Non")}</Badge></Td>
-                          <Td align="center"><Badge tone={u.blocked ? 'danger' : 'mint'}>{u.blocked ? tt("Bloke") : tt("Aktif")}</Badge></Td>
+                          <Td align="center"><div className="flex items-center justify-center gap-1.5 flex-wrap"><Badge tone={u.blocked ? 'danger' : 'mint'}>{u.blocked ? tt("Bloke") : tt("Aktif")}</Badge>{privateBeta && u.role === 'member' && (u.betaAccess ? <Badge tone="navy">{tt("Aksè tès")}</Badge> : <Badge tone="muted">{tt("San aksè")}</Badge>)}</div></Td>
                         </tr>
                       ))}
                   </tbody>
@@ -3367,6 +3389,12 @@ export default function BlicPayAdmin() {
                 <BadgeCheck size={12} /> {selectedUser.verified ? tt("Retire verifikasyon") : tt("Verifye@@verb")}
               </button>
             </div>
+            {selectedUser.role === 'member' && (
+              <button onClick={() => toggleBeta(selectedUser)} className="bp-btn mt-2 w-full py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5"
+                style={{ background: selectedUser.betaAccess ? C.card : C.navy, border: `1px solid ${selectedUser.betaAccess ? C.border : C.navy}`, color: selectedUser.betaAccess ? C.danger : '#fff' }}>
+                <KeyRound size={12} /> {selectedUser.betaAccess ? tt("Retire aksè tès") : tt("Bay aksè tès (tèstè)")}
+              </button>
+            )}
 
             <p className="mt-5 text-sm font-semibold" style={{ color: C.muted }}>{tt("Ajisteman manyèl balans")}</p>
             <div className="mt-2 flex items-center gap-2">

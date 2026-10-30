@@ -1,6 +1,14 @@
 // Diksyonè panèl admin lan: tèks kreyòl → [français, english].
 // Kle a se tèks kreyòl EGZAK ki nan kòd la (tt("...")). "@@kontèks" = menm mo, lòt sans.
 export const ADMIN_DICT = {
+  "Mòd tès prive aktif": ["Mode test privé actif", "Private testing mode on"],
+  "Sèlman admin, ajan ak kont ki gen « Aksè tès » ka konekte nan app la ak sit la. Lòt moun ka kreye kont men yo pa ka antre.": ["Seuls les admins, les agents et les comptes avec « Accès test » peuvent se connecter à l'app et au site. Les autres peuvent créer un compte mais ne peuvent pas entrer.", "Only admins, agents and accounts with “Test access” can sign in to the app and website. Others can create an account but cannot get in."],
+  "Aksè tès": ["Accès test", "Test access"],
+  "San aksè": ["Sans accès", "No access"],
+  "Aksè tès bay.": ["Accès test accordé.", "Test access granted."],
+  "Aksè tès retire.": ["Accès test retiré.", "Test access removed."],
+  "Retire aksè tès": ["Retirer l'accès test", "Remove test access"],
+  "Bay aksè tès (tèstè)": ["Donner l'accès test (testeur)", "Grant test access (tester)"],
   'Yon bagay pa mache. Eseye ankò.': ['Un problème est survenu. Réessayez.', 'Something went wrong. Please try again.'],
   'Poukisa dokiman sa a refize? (kliyan an ap wè mesaj sa a)': ['Pourquoi ce document est-il refusé ? (le client verra ce message)', 'Why is this document rejected? (the client will see this message)'],
   'Ekri rezon refi a anvan.': ['Indiquez d’abord le motif du refus.', 'Enter the rejection reason first.'],
