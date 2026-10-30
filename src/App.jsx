@@ -1854,12 +1854,7 @@ export default function BlicPayAdmin() {
 
         <div className="w-full max-w-sm rounded-lg relative" style={{ background: C.card, padding: '32px 28px', border: `1px solid ${C.navy}`, boxShadow: '0px 12px 32px -4px rgba(10,33,64,0.28)' }}>
           <div className="absolute top-4 right-4"><LangSwitch lang={lang} setLang={setLang} /></div>
-          <div className="flex items-center gap-2">
-            <Logo size={28} />
-            <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 18, color: C.ink }}>
-              {tt("BLIC")}<span style={{ color: C.gold }}>{tt("Pay")}</span>
-            </span>
-          </div>
+          <img src="/brand/logo-full.png" alt="BLICPay — Global · Secure · Digital" style={{ height: 64, width: 'auto', display: 'block' }} />
           <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 21, color: C.ink, marginTop: 18 }}>{tt("Byenveni")}</h1>
           <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>{tt("Konekte pou jere kont BLICPay yo.")}</p>
 
@@ -1914,9 +1909,9 @@ export default function BlicPayAdmin() {
       {/* Meni lateral (gwo ekran) — seksyon: Jeneral, Operasyon, Konfòmite, Administrasyon */}
       <aside className="adm-side flex-col" style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 248, zIndex: 35, background: C.navyDeep, borderRight: '1px solid #0F2D52' }}>
         <div className="flex items-center gap-2.5" style={{ padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div className="rounded-lg flex items-center justify-center font-extrabold text-white" style={{ width: 32, height: 32, background: C.navy, border: `1px solid ${C.gold}` }}>B</div>
+          <div className="rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: '#fff', padding: 3 }}><img src="/brand/logo-symbol.png" alt="BLICPay" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
           <div>
-            <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', lineHeight: 1.1 }}>BLIC<span style={{ color: C.gold }}>Pay</span></p>
+            <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', lineHeight: 1.1 }}>BLIC<span style={{ color: '#3FB8EC', fontStyle: 'italic' }}>Pay</span></p>
             <p className="text-[10px] uppercase tracking-widest" style={{ color: '#7a8aa3' }}>{tt("Konsòl operasyon")}</p>
           </div>
         </div>
@@ -1959,9 +1954,9 @@ export default function BlicPayAdmin() {
         <div className="flex items-center justify-between" style={{ padding: '9px 24px', borderBottom: '1px solid rgba(19,44,80,0.6)' }}>
           <div className="flex items-center gap-3">
             <div className="adm-hide-lg flex items-center gap-2.5">
-              <div className="rounded-lg flex items-center justify-center font-extrabold text-white" style={{ width: 30, height: 30, background: C.navy, border: `1px solid ${C.gold}` }}>B</div>
+              <div className="rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, background: '#fff', padding: 3 }}><img src="/brand/logo-symbol.png" alt="BLICPay" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
               <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', letterSpacing: -0.2 }}>
-                {tt("BLIC")}<span style={{ color: C.gold }}>{tt("Pay")}</span>
+                {tt("BLIC")}<span style={{ color: '#3FB8EC', fontStyle: 'italic' }}>{tt("Pay")}</span>
               </span>
               <span className="hidden lg:inline-block text-[10px] uppercase font-semibold rounded" style={{ ...fontMono, padding: '2px 7px', background: C.navy, color: '#9fb0c7', border: '1px solid #334', letterSpacing: 0.6 }}>
                 {tt("Panèl Admin")}
