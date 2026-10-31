@@ -218,6 +218,8 @@ function BusinessReview({ token }) {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [kyb, setKyb] = useState(null);
+  const [kybBusy, setKybBusy] = useState(false);
 
   const T = (l) => (l ? l[CURRENT_LANG] || l.ht || l.fr : '');
   const docLabel = (k) => T(types?.documents?.[k]) || k;
@@ -250,6 +252,15 @@ function BusinessReview({ token }) {
     } catch (e) {
       setMsg({ error: true, text: e.message });
     }
+    setKyb(null);
+    apiFetch(`/admin/businesses/${b.id}/kyb`, { token }).then(setKyb).catch(() => {});
+  }
+
+  async function refreshKyb() {
+    setKybBusy(true);
+    try { setKyb(await apiFetch(`/admin/businesses/${selected.id}/kyb/refresh`, { method: 'POST', token })); }
+    catch (e) { setMsg({ error: true, text: e.message }); }
+    finally { setKybBusy(false); }
   }
 
   async function viewDoc(d) {
@@ -394,6 +405,44 @@ function BusinessReview({ token }) {
               </div>
             </div>
             {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>{tt("Dènye nòt:")} {b.adminNote}</p>}
+            <div className="rounded-xl" style={{ border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+              <div className="flex items-center justify-between gap-2" style={{ padding: '10px 12px', background: '#F9FAFC', borderBottom: `1px solid ${C.border}` }}>
+                <div className="flex items-center gap-2"><ShieldCheck size={15} color={C.navy} /><p className="text-[13px] font-semibold">{tt("Verifikasyon otomatik (Didit KYB)")}</p></div>
+                <div className="flex items-center gap-2">
+                  {kyb?.status ? <Badge tone={kyb.status === 'Approved' ? 'mint' : kyb.status === 'Declined' ? 'danger' : kyb.status === 'In Review' ? 'amber' : 'navy'}>{kyb.status === 'Approved' ? tt("Apwouve@@kyb") : kyb.status === 'Declined' ? tt("Refize@@kyb") : kyb.status === 'In Review' ? tt("Pou egzamine") : tt("An kou")}</Badge> : <Badge tone="muted">{tt("Poko kòmanse")}</Badge>}
+                  {kyb?.status && <button onClick={refreshKyb} disabled={kybBusy} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ border: `1px solid ${C.border}`, background: '#fff' }} aria-label={tt("Rafrechi")}><RefreshCw size={13} color={C.muted} style={kybBusy ? { animation: 'spin .8s linear infinite' } : undefined} /></button>}
+                </div>
+              </div>
+              <div style={{ padding: 12 }} className="text-[13px]">
+                {!kyb?.status ? (
+                  <p style={{ color: C.muted }}>{tt("Antrepriz la poko lanse verifikasyon otomatik la. Li fè l apre li soumèt dosye a (frè ouvèti a pran lè sa a).")}</p>
+                ) : !kyb.summary ? (
+                  <p style={{ color: C.muted }}>{tt("Verifikasyon an kòmanse — rezilta a ap parèt isit la lè Didit fini.")}</p>
+                ) : (
+                  <div className="space-y-2.5">
+                    {kyb.summary.reason && <p style={{ color: C.danger }}>{tt("Rezon:")} {kyb.summary.reason}</p>}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                      {[[tt("Non nan rejis la"), kyb.summary.company?.name], [tt("Nimewo rejis"), kyb.summary.company?.number], [tt("Estati antrepriz"), kyb.summary.company?.status], [tt("Kreye le"), kyb.summary.company?.incorporatedOn]].map(([k, v]) => (
+                        <div key={k}><p className="text-[11px] uppercase font-semibold" style={{ color: C.muted }}>{k}</p><p>{v || '—'}</p></div>
+                      ))}
+                    </div>
+                    {kyb.summary.people?.length > 0 && (
+                      <div>
+                        <p className="text-[11px] uppercase font-semibold" style={{ color: C.muted, marginBottom: 4 }}>{tt("Moun kle (dirijan, aksyonè, UBO)")}</p>
+                        {kyb.summary.people.map((pp, i) => (
+                          <div key={i} className="flex items-center justify-between" style={{ padding: '5px 0', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
+                            <span>{pp.name || '—'} <span style={{ color: C.muted }}>{pp.role ? `· ${pp.role}` : ''}{pp.ownership != null ? ` · ${pp.ownership}%` : ''}</span></span>
+                            {pp.status && <span className="text-[12px]" style={{ color: C.muted }}>{pp.status}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <p style={{ color: kyb.summary.amlHits ? C.danger : C.mint }}>{kyb.summary.amlHits ? tt("{0} rezilta AML pou egzamine", kyb.summary.amlHits) : tt("Pa gen rezilta AML")}</p>
+                  </div>
+                )}
+                {kyb?.feePaidAt && <p className="text-[12px] mt-2" style={{ color: C.muted }}>{tt("Frè ouvèti peye le {0}", new Date(kyb.feePaidAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR'))}</p>}
+              </div>
+            </div>
           </div>
 
           <div className="p-5 rounded-2xl flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -2261,7 +2310,7 @@ export default function BlicPayAdmin() {
           {nav === 'overview' && (() => {
             const totalDeposit = financeData?.totalDepositVolume ?? 0;
             const totalWithdrawal = financeData?.totalWithdrawalVolume ?? 0;
-            const revenue = financeData?.totalRevenue ?? financeData?.breakdown?.withdrawalFees ?? 0;
+            const revenue = financeData?.total ?? financeData?.breakdown?.withdrawalFees ?? 0;
             const totalBalance = recon?.totalLiabilities ?? 0;
             const held = recon?.totalAssets ?? 0;
             const coveragePct = recon?.coverage != null ? Math.round(recon.coverage * 1000) / 10 : null;
@@ -3891,6 +3940,7 @@ export default function BlicPayAdmin() {
               <div className="rounded-lg" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                 {[
                   { label: tt("Frè retrè"), sub: tt("1,25% sou lajan elektwonik"), value: financeData.breakdown.withdrawalFees, accent: C.mint },
+                  { label: tt("Frè ouvèti kont antrepriz"), sub: tt("Kouvri verifikasyon Didit KYB"), value: financeData.breakdown.businessOpeningFees || 0, accent: C.navy },
                 ].map((row, i) => (
                   <div key={row.label} className="flex items-center justify-between" style={{ padding: '15px 18px', borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                     <div className="flex items-center gap-3">
