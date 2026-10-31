@@ -1120,6 +1120,16 @@ export default function BlicPayAdmin() {
   const [viewingReceipt, setViewingReceipt] = useState(null);
   // Chanje modpas pwòp kont admin/ajan an
   const [pwModalOpen, setPwModalOpen] = useState(false);
+  // Kòd imèl pou koneksyon admin + fenèt sekirite (imèl kont lan)
+  const [adminOtp, setAdminOtp] = useState(null);
+  const [adminOtpCode, setAdminOtpCode] = useState('');
+  const [secOpen, setSecOpen] = useState(false);
+  const [sec, setSec] = useState(null);
+  const [secForm, setSecForm] = useState({ email: '', password: '', code: '' });
+  const [secChallenge, setSecChallenge] = useState(null);
+  const [secBusy, setSecBusy] = useState(false);
+  const [secError, setSecError] = useState('');
+  const [secDone, setSecDone] = useState(false);
   const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState(false);
@@ -1715,7 +1725,42 @@ export default function BlicPayAdmin() {
     }
     setLoginLoading(true);
     try {
-      const { token: newToken, user } = await apiFetch('/auth/login', { method: 'POST', body: loginForm });
+      const r = await apiFetch('/auth/login', { method: 'POST', body: { ...loginForm, identifier: loginForm.phone } });
+      if (r.otpRequired) { setAdminOtp({ challengeId: r.challengeId, email: r.email }); setAdminOtpCode(''); return; }
+      await enterAdmin(r.token, r.user);
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function verifyAdminOtp() {
+    setLoginError('');
+    if (!/^\d{6}$/.test(adminOtpCode)) { setLoginError(tt("Antre 6 chif kòd la.")); return; }
+    setLoginLoading(true);
+    try {
+      const r = await apiFetch('/auth/login/verify', { method: 'POST', body: { challengeId: adminOtp.challengeId, code: adminOtpCode, deviceLabel: 'Console admin' } });
+      await enterAdmin(r.token, r.user);
+      setAdminOtp(null);
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  async function resendAdminOtp() {
+    setLoginError('');
+    try {
+      const r = await apiFetch('/auth/code/resend', { method: 'POST', body: { challengeId: adminOtp.challengeId } });
+      setAdminOtp((o) => ({ ...o, challengeId: r.challengeId }));
+      setAdminOtpCode('');
+      flash(tt("Nouvo kòd voye."));
+    } catch (err) { setLoginError(err.message); }
+  }
+
+  async function enterAdmin(newToken, user) {
       if (user.role !== 'admin' && user.role !== 'agent') {
         setLoginError(tt("Kont sa a pa gen aksè admin."));
         return;
@@ -1726,11 +1771,32 @@ export default function BlicPayAdmin() {
       await loadPending(newToken);
       if (user.role !== 'agent') { loadExchangeRate(newToken); loadFinance('all', newToken); loadReserves(newToken); loadRecon(newToken); loadAlertCount(newToken); loadAccessMode(newToken); }
       loadNotifications(newToken);
-    } catch (err) {
-      setLoginError(err.message);
-    } finally {
-      setLoginLoading(false);
-    }
+  }
+
+  async function openSecurity() {
+    setSecOpen(true); setSecError(''); setSecDone(false); setSecChallenge(null);
+    setSecForm({ email: '', password: '', code: '' });
+    try { setSec(await apiFetch('/auth/me/security', { token })); } catch { setSec(null); }
+  }
+  async function sendSecCode() {
+    setSecError('');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(secForm.email.trim())) { setSecError(tt("Imèl la pa valab.")); return; }
+    if (!secForm.password) { setSecError(tt("Antre modpas aktyèl ou.")); return; }
+    setSecBusy(true);
+    try {
+      const r = await apiFetch('/auth/me/email', { method: 'POST', token, body: { email: secForm.email.trim(), password: secForm.password } });
+      setSecChallenge({ id: r.challengeId, email: r.email });
+    } catch (err) { setSecError(err.message); } finally { setSecBusy(false); }
+  }
+  async function verifySecCode() {
+    setSecError('');
+    if (!/^\d{6}$/.test(secForm.code)) { setSecError(tt("Antre 6 chif kòd la.")); return; }
+    setSecBusy(true);
+    try {
+      const r = await apiFetch('/auth/me/email/verify', { method: 'POST', token, body: { challengeId: secChallenge.id, code: secForm.code } });
+      setSec((x) => ({ ...(x || {}), email: r.email, emailVerified: true, otpActive: true, everyLogin: true }));
+      setSecDone(true);
+    } catch (err) { setSecError(err.message); } finally { setSecBusy(false); }
   }
 
   function openPasswordModal() {
@@ -1956,6 +2022,28 @@ export default function BlicPayAdmin() {
         <main className="flex-1 flex flex-col">
           <div className="flex justify-end" style={{ padding: '20px 28px' }}><LangSwitch lang={lang} setLang={setLang} /></div>
           <div className="flex-1 flex items-center justify-center px-6 pb-16">
+            {adminOtp ? (
+            <form className="w-full fadein" style={{ maxWidth: 400 }} onSubmit={(e) => { e.preventDefault(); verifyAdminOtp(); }}>
+              <span className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: '#EAF1FB' }}><Mail size={26} color={C.navy} /></span>
+              <h1 style={{ ...fontDisplay, fontWeight: 700, fontSize: 28, color: C.ink, marginTop: 22 }}>{tt("Verifye idantite w")}</h1>
+              <p className="text-[15px]" style={{ color: C.muted, marginTop: 6 }}>{tt("Nou voye yon kòd 6 chif bay")} <b style={{ color: C.ink }}>{adminOtp.email}</b>.</p>
+              <input autoFocus value={adminOtpCode} onChange={(e) => setAdminOtpCode(e.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+                inputMode="numeric" autoComplete="one-time-code" placeholder="••••••"
+                className="w-full rounded-xl" style={{ marginTop: 24, height: 58, textAlign: 'center', fontSize: 26, letterSpacing: 12, fontWeight: 700, background: '#fff', border: `1px solid ${C.border}`, color: C.ink, ...fontMono }} />
+              {loginError && (
+                <div className="flex items-start gap-2 text-[13px] rounded-xl" style={{ marginTop: 14, padding: '10px 12px', background: '#FDECEA', color: '#B3261E', border: '1px solid #F7C9C4' }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> {loginError}
+                </div>
+              )}
+              <button type="submit" disabled={loginLoading} className="bp-btn w-full rounded-xl font-semibold text-white" style={{ marginTop: 20, height: 48, background: C.navy, opacity: loginLoading ? 0.7 : 1 }}>
+                {loginLoading ? tt("Tann...") : tt("Konfime@@otp")}
+              </button>
+              <div className="flex items-center justify-between text-[13.5px] font-semibold" style={{ marginTop: 18 }}>
+                <button type="button" onClick={() => { setAdminOtp(null); setLoginError(''); }} className="flex items-center gap-1" style={{ color: C.muted }}><ChevronLeft size={15} /> {tt("Retounen")}</button>
+                <button type="button" onClick={resendAdminOtp} style={{ color: C.sky }}>{tt("Voye yon lòt kòd")}</button>
+              </div>
+            </form>
+            ) : (
             <form className="w-full fadein" style={{ maxWidth: 400 }} onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
               <img src="/brand/logo-full.png" alt="BLICPay" className="lg:hidden" style={{ height: 52, width: 'auto', marginBottom: 28 }} />
               <h1 style={{ ...fontDisplay, fontWeight: 700, fontSize: 28, color: C.ink }}>{tt("Byenveni")}</h1>
@@ -1987,6 +2075,7 @@ export default function BlicPayAdmin() {
               </button>
               <p className="text-xs flex items-center gap-1.5" style={{ color: C.faint, marginTop: 22 }}><Lock size={12} /> {tt("Aksè anrejistre nan jounal odit la")}</p>
             </form>
+            )}
           </div>
         </main>
       </div>
@@ -2067,6 +2156,7 @@ export default function BlicPayAdmin() {
               <p className="text-[13px] font-semibold truncate" style={{ color: '#fff' }}>{admin?.fullName}</p>
               <p className="text-[11.5px] truncate" style={{ color: 'rgba(255,255,255,.55)' }}>{admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch || '') : tt("Sipè admin")}</p>
             </div>
+            <button onClick={openSecurity} title={tt("Sekirite kont")} aria-label={tt("Sekirite kont")} className="adm-link w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,.7)' }}><ShieldCheck size={15} /></button>
             <button onClick={openPasswordModal} title={tt("Chanje modpas")} aria-label={tt("Chanje modpas")} className="adm-link w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,.7)' }}><KeyRound size={15} /></button>
             <button onClick={logout} title={tt("Dekonekte")} aria-label={tt("Dekonekte")} className="adm-link w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,.7)' }}><LogOut size={15} /></button>
           </div>
@@ -4170,6 +4260,51 @@ export default function BlicPayAdmin() {
             <div className="flex-1 overflow-auto p-3 flex items-center justify-center" style={{ background: C.bg }}>
               <img src={`data:${viewingReceipt.proofMimeType};base64,${viewingReceipt.proofImage}`} alt={tt("Resi")}
                 className="max-w-full max-h-full rounded-lg object-contain" />
+            </div>
+          </div>
+        </>
+      )}
+
+      {secOpen && (
+        <>
+          <div onClick={() => !secBusy && setSecOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(11,27,51,0.5)', zIndex: 50 }} />
+          <div className="fadein" style={{ position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 'min(460px, 92vw)', background: C.card, borderRadius: 16, zIndex: 51, overflow: 'hidden', boxShadow: '0 24px 60px -20px rgba(11,31,69,.5)' }}>
+            <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: `1px solid ${C.border}` }}>
+              <div className="flex items-center gap-2"><ShieldCheck size={17} color={C.navy} /><p className="text-[15px] font-semibold">{tt("Sekirite kont")}</p></div>
+              <button onClick={() => setSecOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.bg }} aria-label={tt("Fèmen")}><X size={14} color={C.muted} /></button>
+            </div>
+            <div className="p-5">
+              <div className="rounded-xl flex items-start gap-3" style={{ padding: 14, background: sec?.otpActive ? '#E7F6EF' : '#FEF4E2', border: `1px solid ${sec?.otpActive ? '#BFE7D4' : '#F6DCA9'}` }}>
+                {sec?.otpActive ? <Check size={18} color={C.mint} style={{ flexShrink: 0, marginTop: 1 }} /> : <AlertCircle size={18} color={C.amber} style={{ flexShrink: 0, marginTop: 1 }} />}
+                <div>
+                  <p className="text-[14px] font-semibold" style={{ color: sec?.otpActive ? '#0E7A54' : '#9A5F05' }}>{sec?.otpActive ? tt("Kòd imèl aktive") : tt("Kòd imèl poko aktive")}</p>
+                  <p className="text-[13px] mt-0.5" style={{ color: C.muted }}>{sec?.email ? tt("Chak koneksyon mande yon kòd voye bay {0}.", sec.email) : tt("Ajoute yon imèl: chak fwa ou konekte, n ap voye yon kòd 6 chif ladan l.")}</p>
+                </div>
+              </div>
+              {secDone ? (
+                <div className="text-center" style={{ paddingTop: 22 }}>
+                  <p className="text-[14px] font-semibold">{tt("Imèl la konfime.")}</p>
+                  <p className="text-[13px] mt-1" style={{ color: C.muted }}>{tt("Pwochen koneksyon an ap mande yon kòd.")}</p>
+                  <button onClick={() => setSecOpen(false)} className="bp-btn w-full rounded-xl text-sm font-semibold text-white" style={{ marginTop: 18, height: 44, background: C.navy }}>{tt("Fèmen")}</button>
+                </div>
+              ) : !secChallenge ? (
+                <div style={{ marginTop: 18 }} className="space-y-3">
+                  <label className="block"><span className="block text-[13px] font-semibold mb-1.5">{sec?.email ? tt("Nouvo imèl") : tt("Imèl")}</span>
+                    <input type="email" value={secForm.email} onChange={(e) => setSecForm((f) => ({ ...f, email: e.target.value }))} placeholder="nom@blicpayht.com" className="w-full rounded-xl text-[14.5px]" style={{ height: 44, padding: '0 14px', border: `1px solid ${C.border}` }} /></label>
+                  <label className="block"><span className="block text-[13px] font-semibold mb-1.5">{tt("Modpas aktyèl")}</span>
+                    <input type="password" value={secForm.password} onChange={(e) => setSecForm((f) => ({ ...f, password: e.target.value }))} className="w-full rounded-xl text-[14.5px]" style={{ height: 44, padding: '0 14px', border: `1px solid ${C.border}` }} /></label>
+                  {secError && <p className="text-[13px] flex items-center gap-1.5" style={{ color: C.danger }}><AlertCircle size={14} /> {secError}</p>}
+                  <button onClick={sendSecCode} disabled={secBusy} className="bp-btn w-full rounded-xl text-sm font-semibold text-white" style={{ height: 44, background: C.navy, opacity: secBusy ? 0.7 : 1 }}>{secBusy ? tt("Tann...") : tt("Voye kòd konfimasyon an")}</button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 18 }} className="space-y-3">
+                  <p className="text-[13.5px]" style={{ color: C.muted }}>{tt("Nou voye yon kòd 6 chif bay")} <b style={{ color: C.ink }}>{secChallenge.email}</b>.</p>
+                  <input autoFocus value={secForm.code} onChange={(e) => setSecForm((f) => ({ ...f, code: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) }))} inputMode="numeric" placeholder="••••••"
+                    className="w-full rounded-xl" style={{ height: 54, textAlign: 'center', fontSize: 24, letterSpacing: 10, fontWeight: 700, border: `1px solid ${C.border}`, ...fontMono }} />
+                  {secError && <p className="text-[13px] flex items-center gap-1.5" style={{ color: C.danger }}><AlertCircle size={14} /> {secError}</p>}
+                  <button onClick={verifySecCode} disabled={secBusy} className="bp-btn w-full rounded-xl text-sm font-semibold text-white" style={{ height: 44, background: C.navy, opacity: secBusy ? 0.7 : 1 }}>{secBusy ? tt("Tann...") : tt("Konfime@@otp")}</button>
+                </div>
+              )}
             </div>
           </div>
         </>
