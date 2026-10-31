@@ -205,6 +205,9 @@ const BIZ_FIELDS = [
   ['legalName', 'Rezon sosyal'], ['tradeName', 'Non komèsyal'], ['nif', 'NIF'], ['patenteNumber', 'Patant'],
   ['sector', 'Sektè'], ['address', 'Adrès'], ['city', 'Vil'], ['businessPhone', 'Telefòn'],
   ['businessEmail', 'Imèl'], ['website', 'Sit entènèt'], ['repTitle', 'Pozisyon reprezantan'],
+  ['incorporationDate', 'Dat kreyasyon'], ['employeesRange', 'Anplwaye'], ['expectedMonthlyVolume', 'Volim pa mwa prevwa'],
+  ['sourceOfFunds', 'Sous lajan'], ['accountPurpose', 'Itilizasyon kont lan'], ['foreignActivity', 'Aktivite andeyò Ayiti'],
+  ['activityDescription', 'Aktivite'],
 ];
 
 function BusinessReview({ token }) {
@@ -386,7 +389,14 @@ function BusinessReview({ token }) {
               {BIZ_FIELDS.map(([k, label]) => (
                 <div key={k}>
                   <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt(label)}</p>
-                  <p className="text-sm" style={{ color: b[k] ? C.ink : C.muted }}>{b[k] || '—'}</p>
+                  <p className="text-sm" style={{ color: b[k] != null && b[k] !== '' ? C.ink : C.muted }}>{(() => {
+                    const v = b[k];
+                    if (v == null || v === '') return '—';
+                    if (k === 'incorporationDate') return new Date(v).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { timeZone: 'UTC' });
+                    if (k === 'foreignActivity') return v ? tt('Wi') : tt('Non@@no');
+                    const maps = { employeesRange: types?.employeeRanges, expectedMonthlyVolume: types?.monthlyVolumes, sourceOfFunds: types?.fundSources, accountPurpose: types?.accountPurposes };
+                    return maps[k] ? (T(maps[k][v]) || v) : v;
+                  })()}</p>
                 </div>
               ))}
               <div>

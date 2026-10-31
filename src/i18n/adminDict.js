@@ -1,6 +1,13 @@
 // Diksyonè panèl admin lan: tèks kreyòl → [français, english].
 // Kle a se tèks kreyòl EGZAK ki nan kòd la (tt("...")). "@@kontèks" = menm mo, lòt sans.
 export const ADMIN_DICT = {
+  "Dat kreyasyon": ["Date de création", "Creation date"],
+  "Volim pa mwa prevwa": ["Volume mensuel prévu", "Expected monthly volume"],
+  "Sous lajan": ["Origine des fonds", "Source of funds"],
+  "Itilizasyon kont lan": ["Usage du compte", "Account purpose"],
+  "Aktivite andeyò Ayiti": ["Activité hors d’Haïti", "Activity outside Haiti"],
+  "Aktivite": ["Activité", "Activity"],
+  "Wi": ["Oui", "Yes"],
   "Verifikasyon otomatik (Didit KYB)": ["Vérification automatique (Didit KYB)", "Automatic verification (Didit KYB)"],
   "Apwouve@@kyb": ["Approuvée", "Approved"],
   "Refize@@kyb": ["Refusée", "Declined"],
