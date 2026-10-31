@@ -209,6 +209,11 @@ const BIZ_FIELDS = [
   ['sourceOfFunds', 'Sous lajan'], ['accountPurpose', 'Itilizasyon kont lan'], ['foreignActivity', 'Aktivite andeyò Ayiti'],
   ['activityDescription', 'Aktivite'],
 ];
+const PRO_FIELDS = [
+  ['legalName', 'Non komèsyal'], ['proCategory', 'Kategori aktivite'], ['proMode', 'Mòd travay'], ['proPageUrl', 'Paj an liy'],
+  ['nif', 'NIF'], ['businessPhone', 'Telefòn'], ['address', 'Adrès'], ['city', 'Vil'], ['businessEmail', 'Imèl'],
+  ['expectedMonthlyVolume', 'Volim pa mwa prevwa'], ['sourceOfFunds', 'Sous lajan'], ['activityDescription', 'Aktivite'],
+];
 
 function BusinessReview({ token }) {
   const [types, setTypes] = useState(null);
@@ -367,6 +372,7 @@ function BusinessReview({ token }) {
   const reqs = detail?.requirements || { required: [], optional: [] };
   const docs = b?.documents || [];
   const docFor = (k) => docs.find((d) => d.docType === k);
+  const isPro = b?.legalForm === 'pro';
 
   return (
     <div className="fadein">
@@ -386,7 +392,7 @@ function BusinessReview({ token }) {
               <Badge tone={BIZ_STATUS[b.status]?.tone}>{tt(BIZ_STATUS[b.status]?.label)}</Badge>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-              {BIZ_FIELDS.map(([k, label]) => (
+              {(isPro ? PRO_FIELDS : BIZ_FIELDS).map(([k, label]) => (
                 <div key={k}>
                   <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt(label)}</p>
                   <p className="text-sm" style={{ color: b[k] != null && b[k] !== '' ? C.ink : C.muted }}>{(() => {
@@ -394,18 +400,22 @@ function BusinessReview({ token }) {
                     if (v == null || v === '') return '—';
                     if (k === 'incorporationDate') return new Date(v).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { timeZone: 'UTC' });
                     if (k === 'foreignActivity') return v ? tt('Wi') : tt('Non@@no');
+                    if (k === 'proCategory') return T(types?.proCategories?.[v]?.label) || v;
+                    if (k === 'proMode') return v === 'online' ? tt('An liy sèlman') : tt('Lokal fizik');
                     const maps = { employeesRange: types?.employeeRanges, expectedMonthlyVolume: types?.monthlyVolumes, sourceOfFunds: types?.fundSources, accountPurpose: types?.accountPurposes };
                     return maps[k] ? (T(maps[k][v]) || v) : v;
                   })()}</p>
                 </div>
               ))}
+              {!isPro && (
               <div>
                 <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt("Chif dafè")}</p>
                 <p className="text-sm">{T(types?.turnoverRanges?.[b.turnoverRange]) || '—'}</p>
               </div>
+              )}
             </div>
             <div className="p-3 rounded-lg" style={{ background: C.bg }}>
-              <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{tt("Reprezantan legal")}</p>
+              <p className="text-[11px] font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.6 }}>{isPro ? tt("Titilè kont lan") : tt("Reprezantan legal")}</p>
               <div className="flex items-center justify-between mt-1 gap-2">
                 <div>
                   <p className="text-sm font-semibold">{b.user.fullName}</p>
@@ -415,6 +425,22 @@ function BusinessReview({ token }) {
               </div>
             </div>
             {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>{tt("Dènye nòt:")} {b.adminNote}</p>}
+            {isPro && (
+              <div className="rounded-xl" style={{ border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+                <div className="flex items-center justify-between gap-2" style={{ padding: '10px 12px', background: '#F9FAFC', borderBottom: `1px solid ${C.border}` }}>
+                  <div className="flex items-center gap-2"><ShieldCheck size={15} color={C.navy} /><p className="text-[13px] font-semibold">{tt("Verifikasyon alamen (kont Pwo)")}</p></div>
+                  {b.kybFeePaidAt ? <Badge tone="mint">{tt("Frè peye")}</Badge> : <Badge tone="danger">{tt("Frè poko peye")}</Badge>}
+                </div>
+                <div style={{ padding: 12 }} className="text-[13px] space-y-2">
+                  <p style={{ color: C.muted }}>{tt("Tcheke: NIF ak non an koresponn ak CIP titilè a, adrès la gen mwens pase 3 mwa, relve a montre yon aktivite regilye, epi prèv aktivite a koresponn ak kategori a.")}</p>
+                  {b.proMode === 'online' && b.proVerifyCode && (
+                    <p>{tt("Kòd pou jwenn nan bio paj la:")} <b style={{ letterSpacing: 1 }}>{b.proVerifyCode}</b>{b.proPageUrl ? <> — <a href={/^https?:/.test(b.proPageUrl) ? b.proPageUrl : `https://${b.proPageUrl}`} target="_blank" rel="noreferrer" style={{ color: C.navy, textDecoration: 'underline' }}>{b.proPageUrl}</a></> : null}</p>
+                  )}
+                  {b.kybFeePaidAt && <p className="text-[12px]" style={{ color: C.muted }}>{tt("Frè ouvèti peye le {0}", new Date(b.kybFeePaidAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR'))}</p>}
+                </div>
+              </div>
+            )}
+            {!isPro && (
             <div className="rounded-xl" style={{ border: `1px solid ${C.border}`, overflow: 'hidden' }}>
               <div className="flex items-center justify-between gap-2" style={{ padding: '10px 12px', background: '#F9FAFC', borderBottom: `1px solid ${C.border}` }}>
                 <div className="flex items-center gap-2"><ShieldCheck size={15} color={C.navy} /><p className="text-[13px] font-semibold">{tt("Verifikasyon otomatik (Didit KYB)")}</p></div>
@@ -453,18 +479,21 @@ function BusinessReview({ token }) {
                 {kyb?.feePaidAt && <p className="text-[12px] mt-2" style={{ color: C.muted }}>{tt("Frè ouvèti peye le {0}", new Date(kyb.feePaidAt).toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR'))}</p>}
               </div>
             </div>
+            )}
           </div>
 
           <div className="p-5 rounded-2xl flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}` }}>
             <p className="font-bold">{tt("Dokiman legal")}</p>
-            {[...reqs.required.map((k) => [k, true]), ...reqs.optional.map((k) => [k, false])].map(([k, req]) => {
+            {[...reqs.required.map((k) => [k, true]), ...(reqs.anyOf || []).map((k, i) => [k, 'any', i]), ...reqs.optional.map((k) => [k, false])].map(([k, req, ai]) => {
               const d = docFor(k);
               return (
-                <div key={k} className="p-3 rounded-lg flex items-center justify-between gap-3" style={{ border: `1px solid ${C.border}` }}>
+                <React.Fragment key={k}>
+                {req === 'any' && ai === 0 && <p className="text-[12px] font-semibold mt-1" style={{ color: C.muted }}>{tt("Prèv aktivite — omwen youn")}</p>}
+                <div className="p-3 rounded-lg flex items-center justify-between gap-3" style={{ border: `1px solid ${C.border}` }}>
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">{docLabel(k)}</p>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                      {!d ? <Badge tone={req ? 'danger' : 'muted'}>{req ? tt("Manke") : tt("Opsyonèl")}</Badge>
+                      {!d ? <Badge tone={req === 'any' ? 'amber' : req ? 'danger' : 'muted'}>{req === 'any' ? tt("Youn nan lis la") : req ? tt("Manke") : tt("Opsyonèl")}</Badge>
                         : d.status === 'accepted' ? <Badge tone="mint">{tt("Aksepte")}</Badge>
                         : d.status === 'rejected' ? <Badge tone="danger">{tt("Refize")}</Badge>
                         : <Badge tone="amber">{tt("Pou egzamine")}</Badge>}
@@ -490,6 +519,7 @@ function BusinessReview({ token }) {
                     </div>
                   )}
                 </div>
+                </React.Fragment>
               );
             })}
 
@@ -497,14 +527,14 @@ function BusinessReview({ token }) {
               <p className="font-bold">{tt("Desizyon")}</p>
               {detail.missing?.length > 0 && (
                 <p className="text-xs p-2.5 rounded-lg" style={{ background: 'rgba(181,72,46,0.08)', color: C.danger }}>
-                  {tt("Dosye a pa konplè:")} {detail.missing.map((m) => (m.startsWith('doc:') ? docLabel(m.slice(4)) : m.slice(6))).join(', ')}
+                  {tt("Dosye a pa konplè:")} {detail.missing.map((m) => (m === 'doc:activity_proof' ? tt("Prèv aktivite") : m.startsWith('doc:') ? docLabel(m.slice(4)) : m.slice(6))).join(', ')}
                 </p>
               )}
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={tt("Rezon refi a oswa sa kliyan an dwe voye (obligatwa pou refize / mande enfòmasyon)")}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none" style={{ border: `1px solid ${C.border}`, background: C.bg, resize: 'vertical' }} />
               <div className="flex flex-wrap gap-2">
                 <button disabled={busy} onClick={() => decide('approve')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-1.5" style={{ background: C.mint, opacity: busy ? 0.6 : 1 }}>
-                  <BadgeCheck size={15} /> {tt("Apwouve kont antrepriz la")}
+                  <BadgeCheck size={15} /> {isPro ? tt("Apwouve kont Pwo a") : tt("Apwouve kont antrepriz la")}
                 </button>
                 <button disabled={busy} onClick={() => decide('request-info')} className="bp-btn px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5" style={{ background: C.bg, color: C.navy, border: `1px solid ${C.border}`, opacity: busy ? 0.6 : 1 }}>
                   <FileText size={15} /> {tt("Mande plis enfòmasyon")}
