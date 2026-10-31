@@ -4,7 +4,7 @@ import {
   DollarSign, Banknote, ArrowLeftRight, LogOut, LayoutGrid, Wallet,
   AlertCircle, ChevronRight, ChevronLeft, Search, RefreshCw, ArrowDownLeft,
   PiggyBank, HandCoins, FileText, User, Phone, Lock, KeyRound, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
-  ShieldAlert, Scale, ScrollText, Gauge, Filter, Download, Landmark,
+  ShieldAlert, Scale, ScrollText, Gauge, Filter, Download, Landmark, Calendar, MapPin, Activity, ArrowUpRight, Inbox, Settings,
 } from 'lucide-react';
 
 import { ADMIN_DICT } from './i18n/adminDict.js';
@@ -28,10 +28,10 @@ function tt(s, ...args) {
 // Ti seleksyon lang (HT / FR / EN).
 function LangSwitch({ lang, setLang, dark }) {
   return (
-    <div className="flex items-center rounded-full p-0.5" style={{ background: dark ? 'rgba(255,255,255,0.1)' : '#EEF1F6' }}>
+    <div className="flex items-center rounded-full p-0.5" style={{ background: dark ? 'rgba(255,255,255,0.1)' : '#F2F4F7', border: dark ? 'none' : `1px solid ${'#E5E9F0'}` }}>
       {['ht', 'fr', 'en'].map((l) => (
         <button key={l} onClick={() => setLang(l)} className="px-2 py-1 rounded-full text-[11px] font-bold uppercase"
-          style={lang === l ? { background: dark ? '#fff' : '#0A2140', color: dark ? '#0A2140' : '#fff' } : { color: dark ? 'rgba(255,255,255,0.7)' : '#5B6B80' }}>
+          style={lang === l ? { background: dark ? '#fff' : '#fff', color: dark ? '#0A2140' : '#0B1B33', boxShadow: dark ? 'none' : '0 1px 2px rgba(16,24,40,.12)' } : { color: dark ? 'rgba(255,255,255,0.7)' : '#667085' }}>
           {l}
         </button>
       ))}
@@ -56,25 +56,30 @@ async function apiFetch(path, { method = 'GET', body, token } = {}) {
   return data;
 }
 
+// Palèt BLICPay — ble maren (mak la), syan (aksan), nèt pou done yo.
 const C = {
-  bg: '#F3F5F9',
-  paper: '#F3F5F9',
+  bg: '#F4F6FA',
+  paper: '#F4F6FA',
   card: '#FFFFFF',
-  border: '#E2E7EF',
-  ink: '#0F1B2D',
-  muted: '#5F6B7A',
-  navy: '#0F2D52',
-  navyDeep: '#0A2140',
-  sky: '#2C8FB0',
-  gold: '#B9862F',
-  mint: '#1E9E7C',
-  amber: '#B9862F',
-  danger: '#B5482E',
-  purple: '#6D3FD1',
+  border: '#E5E9F0',
+  borderStrong: '#D5DCE6',
+  ink: '#0B1B33',
+  muted: '#667085',
+  faint: '#98A2B3',
+  navy: '#143A73',
+  navyDeep: '#0B1F45',
+  sky: '#1C8FD0',
+  gold: '#1FA2D6',
+  cyan: '#29B6E8',
+  mint: '#12A26F',
+  amber: '#C9820E',
+  danger: '#D9473A',
+  purple: '#6A4BDB',
 };
 
-const fontDisplay = { fontFamily: "'Manrope', sans-serif" };
-const fontMono = { fontFamily: "'IBM Plex Mono', monospace" };
+const fontDisplay = { fontFamily: "'Inter', sans-serif", letterSpacing: '-0.02em' };
+// Chif yo: Inter ak chif tabilè (kolòn yo aliyen) — pi pwòp pase yon font mono.
+const fontMono = { fontFamily: "'Inter', sans-serif", fontVariantNumeric: 'tabular-nums', fontFeatureSettings: "'tnum' 1" };
 
 const methodIcons = {
   moncash: { label: 'Mon Cash', icon: DollarSign, color: '#1E9E7C', logo: 'https://blicpayht.com/logos/moncash.jpg' },
@@ -126,41 +131,44 @@ function Logo({ size = 28 }) {
 
 function Badge({ children, tone = 'muted' }) {
   const map = {
-    muted: { bg: 'rgba(111,106,94,0.10)', fg: C.muted, border: 'rgba(111,106,94,0.22)' },
-    mint: { bg: 'rgba(61,122,92,0.10)', fg: '#2B5842', border: 'rgba(61,122,92,0.25)' },
-    amber: { bg: 'rgba(185,134,47,0.12)', fg: '#8A6423', border: 'rgba(185,134,47,0.28)' },
-    navy: { bg: 'rgba(15,45,82,0.08)', fg: C.navy, border: 'rgba(15,45,82,0.20)' },
-    premium: { bg: 'rgba(109,63,209,0.10)', fg: '#532DA8', border: 'rgba(109,63,209,0.25)' },
-    danger: { bg: 'rgba(181,72,46,0.10)', fg: '#8E341F', border: 'rgba(181,72,46,0.25)' },
+    muted: ['#F2F4F7', '#475467', '#98A2B3'],
+    mint: ['#E7F6EF', '#0E7A54', '#12A26F'],
+    amber: ['#FEF4E2', '#9A5F05', '#E39A1F'],
+    navy: ['#EAF1FB', '#143A73', '#1C8FD0'],
+    premium: ['#F0ECFD', '#4F33B5', '#6A4BDB'],
+    danger: ['#FDECEA', '#B3261E', '#D9473A'],
   };
-  const s = map[tone];
+  const [bg, fg, dot] = map[tone] || map.muted;
   return (
-    <span className="px-2 py-0.5 text-xs font-semibold" style={{ background: s.bg, color: s.fg, border: `1px solid ${s.border}`, borderRadius: 4, letterSpacing: 0.2 }}>
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap" style={{ background: bg, color: fg, borderRadius: 999, padding: '3px 10px 3px 8px', fontSize: 12, fontWeight: 600, lineHeight: '18px' }}>
+      <span style={{ width: 6, height: 6, borderRadius: 999, background: dot, flexShrink: 0 }} />
       {children}
     </span>
   );
 }
 
-function StatCard({ label, value, sub, accent }) {
+function StatCard({ label, value, sub, accent, icon: Icon }) {
   return (
-    <div className="rounded-lg relative overflow-hidden" style={{ background: C.card, border: `1px solid ${C.border}`, padding: '18px 18px 16px' }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, background: accent || C.navy }} />
-      <p className="text-xs font-semibold uppercase" style={{ color: C.muted, letterSpacing: 0.5 }}>{label}</p>
-      <p className="mt-1.5" style={{ ...fontDisplay, fontSize: 24, fontWeight: 800, color: C.ink }}>{value}</p>
+    <div className="adm-card" style={{ padding: '18px 20px' }}>
+      <div className="flex items-center justify-between">
+        <p className="text-[13px] font-medium" style={{ color: C.muted }}>{label}</p>
+        {Icon && <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${accent || C.navy}14` }}><Icon size={16} color={accent || C.navy} /></span>}
+      </div>
+      <p className="mt-2" style={{ ...fontMono, fontSize: 24, fontWeight: 700, color: C.ink, letterSpacing: '-0.02em' }}>{value}</p>
       {sub && <p className="mt-0.5 text-xs" style={{ color: C.muted }}>{sub}</p>}
     </div>
   );
 }
 
 function Th({ children, align }) {
-  return <th style={{ textAlign: align || 'left', fontSize: 10.5, fontWeight: 700, color: C.muted, padding: '10px 14px', letterSpacing: 0.6, textTransform: 'uppercase' }}>{children}</th>;
+  return <th style={{ textAlign: align || 'left', fontSize: 11.5, fontWeight: 600, color: C.muted, padding: '11px 16px', letterSpacing: 0.3, textTransform: 'uppercase', background: '#F9FAFC', borderBottom: `1px solid ${C.border}`, whiteSpace: 'nowrap' }}>{children}</th>;
 }
 function Td({ children, align }) {
-  return <td style={{ textAlign: align || 'left', fontSize: 12.5, padding: '11px 14px', borderTop: `1px solid ${C.border}` }}>{children}</td>;
+  return <td style={{ textAlign: align || 'left', fontSize: 13.5, padding: '13px 16px', borderTop: `1px solid ${C.border}`, color: C.ink, verticalAlign: 'middle' }}>{children}</td>;
 }
 function Table({ children }) {
   return (
-    <div className="rounded-lg overflow-hidden" style={{ border: `1px solid ${C.border}`, background: C.card }}>
+    <div className="adm-card adm-table overflow-x-auto">
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>{children}</table>
     </div>
   );
@@ -168,7 +176,9 @@ function Table({ children }) {
 function EmptyRow({ colSpan, children }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="text-sm text-center py-6" style={{ color: C.muted }}>{children}</td>
+      <td colSpan={colSpan} className="text-sm text-center" style={{ color: C.muted, padding: '40px 16px' }}>
+        <Inbox size={22} color={C.faint} style={{ margin: '0 auto 8px', display: 'block' }} />{children}
+      </td>
     </tr>
   );
 }
@@ -383,7 +393,7 @@ function BusinessReview({ token }) {
                 {b.user.verified ? <Badge tone="mint">{tt("KYC verifye")}</Badge> : <Badge tone="danger">{tt("KYC pa verifye")}</Badge>}
               </div>
             </div>
-            {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>{tt("Dènye nòt:")} {b.adminNote}</p>}
+            {b.adminNote && <p className="text-xs p-3 rounded-lg" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>{tt("Dènye nòt:")} {b.adminNote}</p>}
           </div>
 
           <div className="p-5 rounded-2xl flex flex-col gap-3" style={{ background: C.card, border: `1px solid ${C.border}` }}>
@@ -509,12 +519,12 @@ function downloadCsv(filename, header, rows) {
 
 function PageHead({ icon: Icon, title, sub, right }) {
   return (
-    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4" style={{ marginBottom: 20 }}>
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: C.navyDeep }}><Icon size={20} color={C.gold} /></div>
+    <div className="flex flex-col md:flex-row md:items-end justify-between gap-4" style={{ marginBottom: 22 }}>
+      <div className="flex items-start gap-3.5">
+        <div className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#EAF1FB', border: '1px solid #D6E4F7' }}><Icon size={20} color={C.navy} /></div>
         <div>
-          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 24, color: C.ink }}>{title}</h1>
-          <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>{sub}</p>
+          <h1 style={{ ...fontDisplay, fontWeight: 700, fontSize: 24, color: C.ink, lineHeight: 1.25 }}>{title}</h1>
+          <p className="text-sm" style={{ color: C.muted, marginTop: 3, maxWidth: 720 }}>{sub}</p>
         </div>
       </div>
       {right}
@@ -1904,95 +1914,143 @@ export default function BlicPayAdmin() {
 
   if (!token) {
     return (
-      <div style={{ background: C.navyDeep, minHeight: '100%' }} className="w-full flex items-center justify-center px-6 py-16 relative overflow-hidden">
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
-          * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
-          .bp-btn { transition: all .15s ease; }
-          .bp-btn:hover { filter: brightness(1.06); }
-          input:focus { outline: none; border-color: ${C.gold} !important; }
-        `}</style>
-        <div style={{ position: 'absolute', top: -120, right: -80, width: 360, height: 360, borderRadius: '50%', background: 'rgba(185,134,47,0.08)' }} />
-        <div style={{ position: 'absolute', bottom: -140, left: -100, width: 320, height: 320, borderRadius: '50%', background: 'rgba(44,143,176,0.08)' }} />
-
-        <div className="w-full max-w-sm rounded-lg relative" style={{ background: C.card, padding: '32px 28px', border: `1px solid ${C.navy}`, boxShadow: '0px 12px 32px -4px rgba(10,33,64,0.28)' }}>
-          <div className="absolute top-4 right-4"><LangSwitch lang={lang} setLang={setLang} /></div>
-          <img src="/brand/logo-full.png" alt="BLICPay — Global · Secure · Digital" style={{ height: 64, width: 'auto', display: 'block' }} />
-          <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 21, color: C.ink, marginTop: 18 }}>{tt("Byenveni")}</h1>
-          <p className="text-sm" style={{ color: C.muted, marginTop: 2 }}>{tt("Konekte pou jere kont BLICPay yo.")}</p>
-
-          <div style={{ marginTop: 24 }} className="space-y-3">
-            <input placeholder={tt("Nimewo telefòn")} value={loginForm.phone}
-              onChange={(e) => setLoginForm((f) => ({ ...f, phone: e.target.value }))}
-              className="w-full px-4 py-3 rounded-lg text-sm"
-              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.ink }} />
-            <input placeholder={tt("Modpas")} type="password" value={loginForm.password}
-              onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
-              className="w-full px-4 py-3 rounded-lg text-sm"
-              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.ink }} />
+      <div className="w-full flex" style={{ minHeight: '100vh', background: '#fff' }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+        body { background: #F4F6FA; -webkit-font-smoothing: antialiased; }
+        .bp-btn { transition: background .15s ease, box-shadow .15s ease, filter .15s ease, transform .1s ease; }
+        .bp-btn:hover { filter: brightness(1.04); }
+        .bp-btn:active { transform: scale(0.98); }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #1C8FD0 !important; box-shadow: 0 0 0 3px rgba(28,143,208,.14); }
+        @keyframes fadein { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:translateY(0);} }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .fadein { animation: fadein .25s ease; }
+        .adm-card { background: #fff; border: 1px solid #E5E9F0; border-radius: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+        .adm-table tbody tr { transition: background .12s ease; }
+        .adm-table tbody tr:hover { background: #F9FAFC; }
+        .adm-table table thead tr { background: #F9FAFC; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #D5DCE6; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }`}</style>
+        <aside className="hidden lg:flex flex-col justify-between relative overflow-hidden" style={{ width: '46%', maxWidth: 640, padding: '40px 52px', background: 'linear-gradient(160deg, #0B1F45 0%, #143A73 58%, #1C6FA8 100%)', color: '#fff' }}>
+          <div style={{ position: 'absolute', right: -170, top: -170, width: 480, height: 480, borderRadius: '50%', background: 'radial-gradient(circle, rgba(41,182,232,.32), transparent 65%)' }} />
+          <div className="relative flex items-center gap-3">
+            <span className="rounded-xl flex items-center justify-center" style={{ width: 44, height: 44, background: '#fff', padding: 5 }}><img src="/brand/logo-symbol.png" alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></span>
+            <div>
+              <p style={{ fontWeight: 800, fontSize: 21, letterSpacing: -0.3 }}>BLIC<span style={{ color: '#5CCBF2', fontStyle: 'italic' }}>Pay</span></p>
+              <p className="text-[11px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,.6)' }}>{tt("Konsòl operasyon")}</p>
+            </div>
           </div>
-          {loginError && (
-            <p className="text-xs flex items-center gap-1.5" style={{ color: C.danger, marginTop: 12 }}>
-              <AlertCircle size={13} /> {loginError}
-            </p>
-          )}
-          <button onClick={handleLogin} disabled={loginLoading}
-            className="bp-btn w-full py-3 rounded-lg font-semibold text-white" style={{ marginTop: 20, background: C.navy, opacity: loginLoading ? 0.7 : 1 }}>
-            {loginLoading ? tt("Tann...") : tt("Konekte")}
-          </button>
-        </div>
+          <div className="relative">
+            <h2 style={{ fontWeight: 800, fontSize: 34, lineHeight: 1.15, letterSpacing: -0.8 }}>{tt("Jere operasyon BLICPay yo an sekirite.")}</h2>
+            <div className="mt-8 space-y-3.5">
+              {[[ShieldCheck, tt("Aksè rezève pou ekip BLICPay la")], [ScrollText, tt("Chak aksyon anrejistre nan jounal odit la")], [Activity, tt("Siveyans tranzaksyon an tan reyèl")]].map(([I, txt]) => (
+                <div key={txt} className="flex items-center gap-3 text-sm" style={{ color: 'rgba(255,255,255,.88)' }}>
+                  <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(255,255,255,.10)', border: '1px solid rgba(255,255,255,.14)' }}><I size={15} color="#5CCBF2" /></span>
+                  {txt}
+                </div>
+              ))}
+            </div>
+          </div>
+          <p className="relative text-xs" style={{ color: 'rgba(255,255,255,.5)' }}>© {new Date().getFullYear()} BLICPay LLC</p>
+        </aside>
+        <main className="flex-1 flex flex-col">
+          <div className="flex justify-end" style={{ padding: '20px 28px' }}><LangSwitch lang={lang} setLang={setLang} /></div>
+          <div className="flex-1 flex items-center justify-center px-6 pb-16">
+            <form className="w-full fadein" style={{ maxWidth: 400 }} onSubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+              <img src="/brand/logo-full.png" alt="BLICPay" className="lg:hidden" style={{ height: 52, width: 'auto', marginBottom: 28 }} />
+              <h1 style={{ ...fontDisplay, fontWeight: 700, fontSize: 28, color: C.ink }}>{tt("Byenveni")}</h1>
+              <p className="text-[15px]" style={{ color: C.muted, marginTop: 6 }}>{tt("Konekte pou jere kont BLICPay yo.")}</p>
+              <label className="block" style={{ marginTop: 28 }}>
+                <span className="block text-[13px] font-semibold mb-1.5" style={{ color: C.ink }}>{tt("Telefòn oswa imèl")}</span>
+                <div className="relative">
+                  <Phone size={16} color={C.faint} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
+                  <input autoComplete="username" value={loginForm.phone} onChange={(e) => setLoginForm((f) => ({ ...f, phone: e.target.value }))}
+                    className="w-full rounded-xl text-[15px]" style={{ height: 48, paddingLeft: 40, paddingRight: 14, background: '#fff', border: `1px solid ${C.border}`, color: C.ink }} />
+                </div>
+              </label>
+              <label className="block" style={{ marginTop: 16 }}>
+                <span className="block text-[13px] font-semibold mb-1.5" style={{ color: C.ink }}>{tt("Modpas")}</span>
+                <div className="relative">
+                  <Lock size={16} color={C.faint} style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
+                  <input type="password" autoComplete="current-password" value={loginForm.password} onChange={(e) => setLoginForm((f) => ({ ...f, password: e.target.value }))}
+                    className="w-full rounded-xl text-[15px]" style={{ height: 48, paddingLeft: 40, paddingRight: 14, background: '#fff', border: `1px solid ${C.border}`, color: C.ink }} />
+                </div>
+              </label>
+              {loginError && (
+                <div className="flex items-start gap-2 text-[13px] rounded-xl" style={{ marginTop: 14, padding: '10px 12px', background: '#FDECEA', color: '#B3261E', border: '1px solid #F7C9C4' }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} /> {loginError}
+                </div>
+              )}
+              <button type="submit" disabled={loginLoading}
+                className="bp-btn w-full rounded-xl font-semibold text-white flex items-center justify-center gap-2" style={{ marginTop: 22, height: 48, background: C.navy, opacity: loginLoading ? 0.7 : 1, boxShadow: '0 10px 24px -12px rgba(20,58,115,.7)' }}>
+                {loginLoading ? tt("Tann...") : <>{tt("Konekte")} <ChevronRight size={17} /></>}
+              </button>
+              <p className="text-xs flex items-center gap-1.5" style={{ color: C.faint, marginTop: 22 }}><Lock size={12} /> {tt("Aksè anrejistre nan jounal odit la")}</p>
+            </form>
+          </div>
+        </main>
       </div>
     );
   }
 
+  const curItem = NAV_ITEMS_ALL.find((i) => i.id === nav);
+  const curSection = NAV_SECTIONS.find(([k]) => k === curItem?.section)?.[1];
   return (
-    <div style={{ background: C.bg, minHeight: '100%', color: C.ink }} className="w-full adm-shell">
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
+    <div style={{ background: C.bg, minHeight: '100vh', color: C.ink }} className="w-full adm-shell">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
-        .bp-btn { transition: all .15s ease; }
+        body { background: #F4F6FA; -webkit-font-smoothing: antialiased; }
+        .bp-btn { transition: background .15s ease, box-shadow .15s ease, filter .15s ease, transform .1s ease; }
         .bp-btn:hover { filter: brightness(1.04); }
         .bp-btn:active { transform: scale(0.98); }
-        .nav-item { transition: background .15s ease; }
-        input:focus, textarea:focus { outline: none; border-color: ${C.sky} !important; }
-        @keyframes fadein { from { opacity:0; transform: translateY(8px);} to {opacity:1; transform:translateY(0);} }
+        input:focus, textarea:focus, select:focus { outline: none; border-color: #1C8FD0 !important; box-shadow: 0 0 0 3px rgba(28,143,208,.14); }
+        @keyframes fadein { from { opacity:0; transform: translateY(6px);} to {opacity:1; transform:translateY(0);} }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .fadein { animation: fadein .3s ease; }
+        .fadein { animation: fadein .25s ease; }
+        .adm-card { background: #fff; border: 1px solid #E5E9F0; border-radius: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+        .adm-table tbody tr { transition: background .12s ease; }
+        .adm-table tbody tr:hover { background: #F9FAFC; }
+        .adm-table table thead tr { background: #F9FAFC; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #D5DCE6; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
         .adm-side { display: none; }
         @media (min-width: 1024px) {
-          .adm-shell { padding-left: 248px; }
+          .adm-shell { padding-left: 260px; }
           .adm-side { display: flex; }
           .adm-topnav { display: none !important; }
           .adm-hide-lg { display: none !important; }
         }
         .adm-link { transition: background .15s ease, color .15s ease; }
         .adm-link:hover { background: rgba(255,255,255,0.06); color: #fff; }
+        .adm-icon-btn { transition: background .15s ease; }
+        .adm-icon-btn:hover { background: #F2F4F7 !important; }
       `}</style>
 
-      {/* Meni lateral (gwo ekran) — seksyon: Jeneral, Operasyon, Konfòmite, Administrasyon */}
-      <aside className="adm-side flex-col" style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 248, zIndex: 35, background: C.navyDeep, borderRight: '1px solid #0F2D52' }}>
-        <div className="flex items-center gap-2.5" style={{ padding: '18px 20px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div className="rounded-lg flex items-center justify-center" style={{ width: 34, height: 34, background: '#fff', padding: 3 }}><img src="/brand/logo-symbol.png" alt="BLICPay" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
+      {/* Meni lateral */}
+      <aside className="adm-side flex-col" style={{ position: 'fixed', top: 0, left: 0, bottom: 0, width: 260, zIndex: 35, background: 'linear-gradient(180deg, #0B1F45 0%, #0D2550 100%)' }}>
+        <div className="flex items-center gap-3" style={{ height: 68, padding: '0 20px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="rounded-xl flex items-center justify-center" style={{ width: 36, height: 36, background: '#fff', padding: 4 }}><img src="/brand/logo-symbol.png" alt="BLICPay" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
           <div>
-            <p style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', lineHeight: 1.1 }}>BLIC<span style={{ color: '#3FB8EC', fontStyle: 'italic' }}>Pay</span></p>
-            <p className="text-[10px] uppercase tracking-widest" style={{ color: '#7a8aa3' }}>{tt("Konsòl operasyon")}</p>
+            <p style={{ fontWeight: 800, fontSize: 17, color: '#fff', lineHeight: 1.1, letterSpacing: -0.2 }}>BLIC<span style={{ color: '#5CCBF2', fontStyle: 'italic' }}>Pay</span></p>
+            <p className="text-[10px] uppercase tracking-widest" style={{ color: 'rgba(255,255,255,.5)', marginTop: 2 }}>{tt("Konsòl operasyon")}</p>
           </div>
         </div>
-        <nav className="flex-1 overflow-y-auto" style={{ padding: '10px 12px 16px' }}>
+        <nav className="flex-1 overflow-y-auto" style={{ padding: '8px 12px 16px' }}>
           {NAV_SECTIONS.map(([sec, label]) => {
             const items = NAV_ITEMS.filter((it) => it.section === sec);
             if (!items.length) return null;
             return (
-              <div key={sec} style={{ marginTop: 14 }}>
-                <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6E7F99', padding: '0 10px 6px' }}>{label}</p>
+              <div key={sec} style={{ marginTop: 16 }}>
+                <p className="text-[10.5px] font-semibold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,.4)', padding: '0 12px 6px' }}>{label}</p>
                 {items.map((item) => {
                   const on = nav === item.id;
                   return (
-                    <button key={item.id} onClick={() => goTo(item)} className="adm-link w-full flex items-center gap-2.5 rounded-lg text-sm"
-                      style={{ padding: '8px 10px', marginBottom: 2, fontWeight: on ? 700 : 500, color: on ? '#fff' : 'rgba(255,255,255,0.68)', background: on ? 'rgba(185,134,47,0.18)' : 'transparent', boxShadow: on ? `inset 3px 0 0 ${C.gold}` : 'none' }}>
-                      <item.icon size={16} color={on ? C.gold : 'currentColor'} />
-                      <span className="flex-1 text-left">{item.label}</span>
-                      {item.count > 0 && <span className="text-[10px] font-bold rounded-full" style={{ padding: '1px 7px', background: sec === 'compliance' ? C.danger : 'rgba(255,255,255,0.16)', color: '#fff' }}>{item.count}</span>}
+                    <button key={item.id} onClick={() => goTo(item)} className="adm-link w-full flex items-center gap-3 rounded-lg text-[13.5px] relative"
+                      style={{ height: 38, padding: '0 12px', marginBottom: 2, fontWeight: on ? 600 : 500, color: on ? '#fff' : 'rgba(255,255,255,0.66)', background: on ? 'rgba(41,182,232,0.14)' : 'transparent' }}>
+                      {on && <span style={{ position: 'absolute', left: -12, top: 9, bottom: 9, width: 3, borderRadius: 3, background: C.cyan }} />}
+                      <item.icon size={17} color={on ? C.cyan : 'currentColor'} strokeWidth={on ? 2.2 : 1.9} />
+                      <span className="flex-1 text-left truncate">{item.label}</span>
+                      {item.count > 0 && <span className="text-[11px] font-semibold rounded-full" style={{ minWidth: 22, padding: '1px 7px', textAlign: 'center', background: sec === 'compliance' ? '#E5544A' : 'rgba(255,255,255,0.14)', color: '#fff' }}>{item.count}</span>}
                     </button>
                   );
                 })}
@@ -2000,114 +2058,79 @@ export default function BlicPayAdmin() {
             );
           })}
         </nav>
-        <div style={{ padding: '12px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <p className="text-[10px]" style={{ color: '#6E7F99' }}>{tt("Aksè anrejistre nan jounal odit la")}</p>
+        <div style={{ padding: 12, borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="flex items-center gap-3 rounded-xl" style={{ padding: 10, background: 'rgba(255,255,255,0.05)' }}>
+            <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #1C8FD0, #143A73)' }}>
+              <span style={{ color: '#fff', fontSize: 12.5, fontWeight: 700 }}>{initials(admin?.fullName || '')}</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold truncate" style={{ color: '#fff' }}>{admin?.fullName}</p>
+              <p className="text-[11.5px] truncate" style={{ color: 'rgba(255,255,255,.55)' }}>{admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch || '') : tt("Sipè admin")}</p>
+            </div>
+            <button onClick={openPasswordModal} title={tt("Chanje modpas")} aria-label={tt("Chanje modpas")} className="adm-link w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,.7)' }}><KeyRound size={15} /></button>
+            <button onClick={logout} title={tt("Dekonekte")} aria-label={tt("Dekonekte")} className="adm-link w-8 h-8 rounded-lg flex items-center justify-center" style={{ color: 'rgba(255,255,255,.7)' }}><LogOut size={15} /></button>
+          </div>
         </div>
       </aside>
 
       {toast && (
-        <div className="fixed top-4 right-4 z-50 fadein px-4 py-3 rounded-xl text-sm flex items-center gap-2 shadow-lg"
-          style={{ background: C.card, border: `1px solid ${C.border}`, color: C.ink }}>
-          <Check size={16} color={C.mint} /> {toast}
+        <div className="fixed top-5 right-5 z-50 fadein px-4 py-3 rounded-xl text-sm flex items-center gap-2.5"
+          style={{ background: C.navyDeep, color: '#fff', boxShadow: '0 12px 32px -8px rgba(11,31,69,.45)' }}>
+          <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: C.mint }}><Check size={12} color="#fff" /></span> {toast}
         </div>
       )}
 
-      {/* barre navigasyon anlè — fikse, li rete vizib pandan kontni an defile */}
-      <div style={{ position: 'sticky', top: 0, zIndex: 30, background: C.navyDeep, borderBottom: '1px solid #0F2D52', boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }}>
-        <div className="flex items-center justify-between" style={{ padding: '9px 24px', borderBottom: '1px solid rgba(19,44,80,0.6)' }}>
-          <div className="flex items-center gap-3">
-            <div className="adm-hide-lg flex items-center gap-2.5">
-              <div className="rounded-lg flex items-center justify-center" style={{ width: 30, height: 30, background: '#fff', padding: 3 }}><img src="/brand/logo-symbol.png" alt="BLICPay" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /></div>
-              <span style={{ ...fontDisplay, fontWeight: 800, fontSize: 17, color: '#fff', letterSpacing: -0.2 }}>
-                {tt("BLIC")}<span style={{ color: '#3FB8EC', fontStyle: 'italic' }}>{tt("Pay")}</span>
-              </span>
-              <span className="hidden lg:inline-block text-[10px] uppercase font-semibold rounded" style={{ ...fontMono, padding: '2px 7px', background: C.navy, color: '#9fb0c7', border: '1px solid #334', letterSpacing: 0.6 }}>
-                {tt("Panèl Admin")}
-              </span>
-            </div>
-
-            <div className="hidden md:block" style={{ width: 1, height: 16, background: '#334', margin: '0 4px' }} />
-
-            <div className="hidden md:flex items-center gap-1.5 text-xs font-semibold rounded-full" style={{
-              padding: '3px 10px', background: 'rgba(185,134,47,0.16)', color: '#e9c583',
-              border: '1px solid rgba(185,134,47,0.35)', letterSpacing: 0.2,
-            }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.gold, display: 'inline-block' }} />
-              {admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch || '') : tt("Sipè Admin — Aksè Konplè")}
+      {/* Ba anlè */}
+      <header style={{ position: 'sticky', top: 0, zIndex: 30, background: 'rgba(255,255,255,0.92)', backdropFilter: 'saturate(180%) blur(10px)', borderBottom: `1px solid ${C.border}` }}>
+        <div className="flex items-center justify-between gap-4" style={{ height: 68, padding: '0 28px' }}>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="adm-hide-lg rounded-lg flex items-center justify-center shrink-0" style={{ width: 32, height: 32, background: C.navyDeep, padding: 4 }}><img src="/brand/logo-symbol.png" alt="BLICPay" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fff', borderRadius: 6 }} /></div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-medium" style={{ color: C.faint }}>{curSection || 'BLICPay'}</p>
+              <p className="text-[16px] font-semibold truncate" style={{ color: C.ink, letterSpacing: -0.2 }}>{curItem?.label}</p>
             </div>
           </div>
-          <div className="flex items-center" style={{ gap: 18 }}>
-            <div className="hidden sm:block text-right">
-              <p style={{ ...fontMono, fontSize: 11, color: '#c7d0dd' }}>
-                {clock.toLocaleTimeString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR')} <span style={{ color: '#7a8aa3' }}>{tt("HTG (UTC-5)")}</span>
-              </p>
-              <p className="text-[10px]" style={{ color: '#7a8aa3' }}>{clock.toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-            </div>
-
-            <button onClick={() => setNotifPanelOpen((o) => !o)} className="w-8 h-8 rounded-full flex items-center justify-center relative" style={{ background: 'rgba(255,255,255,0.1)' }}>
-              <Bell size={15} color="#fff" />
+          <div className="flex items-center gap-2.5">
+            <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] font-semibold rounded-full" style={{ padding: '5px 11px', background: '#EAF1FB', color: C.navy }}>
+              <ShieldCheck size={13} /> {admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch || '') : tt("Sipè Admin — Aksè Konplè")}
+            </span>
+            <span className="hidden xl:inline-flex items-center gap-1.5 text-[12.5px]" style={{ color: C.muted, padding: '0 6px', ...fontMono }}>
+              <Clock size={13} /> {clock.toLocaleTimeString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { hour: '2-digit', minute: '2-digit' })} · {clock.toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { day: '2-digit', month: 'short' })}
+            </span>
+            <LangSwitch lang={lang} setLang={setLang} />
+            <button onClick={() => setNotifPanelOpen((o) => !o)} className="adm-icon-btn w-9 h-9 rounded-lg flex items-center justify-center relative" style={{ border: `1px solid ${C.border}`, background: '#fff' }} aria-label={tt("Notifikasyon")}>
+              <Bell size={16} color={C.ink} />
               {unreadCount > 0 && (
-                <span className="absolute flex items-center justify-center text-white font-bold" style={{
-                  top: -1, right: -1, width: 15, height: 15, borderRadius: '50%', background: C.gold, fontSize: 9,
-                }}>
+                <span className="absolute flex items-center justify-center text-white font-bold" style={{ top: -5, right: -5, minWidth: 17, height: 17, padding: '0 4px', borderRadius: 999, background: C.danger, fontSize: 9.5, border: '2px solid #fff' }}>
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
             </button>
-
-            <div className="hidden sm:flex items-center gap-2.5" style={{ paddingLeft: 14, borderLeft: '1px solid #334' }}>
-              <div className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)', boxShadow: `0 0 0 1.5px ${C.gold}` }}>
-                <span style={{ color: '#fff', fontSize: 12, fontWeight: 700 }}>{initials(admin?.fullName || '')}</span>
-              </div>
-              <div>
-                <p className="text-sm font-semibold" style={{ color: '#fff', lineHeight: 1.2 }}>{admin?.fullName}</p>
-                <p className="text-xs" style={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.2 }}>
-                  {admin?.role === 'agent' ? tt("Ajan · {0}", admin?.branch) : tt("Sipè admin")}
-                </p>
-              </div>
-            </div>
-            <LangSwitch lang={lang} setLang={setLang} dark />
-            <button onClick={openPasswordModal} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label={tt("Chanje modpas")} title={tt("Chanje modpas")}>
-              <KeyRound size={15} color="#fff" />
-            </button>
-            <button onClick={logout} className="w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.1)' }} aria-label={tt("Dekonekte")}>
-              <LogOut size={15} color="#fff" />
+            <button onClick={logout} className="adm-hide-lg adm-icon-btn w-9 h-9 rounded-lg flex items-center justify-center" style={{ border: `1px solid ${C.border}`, background: '#fff' }} aria-label={tt("Dekonekte")}>
+              <LogOut size={16} color={C.ink} />
             </button>
           </div>
         </div>
-        <div className="adm-topnav flex items-center overflow-x-auto" style={{ padding: '0 12px', gap: 2 }}>
-          {NAV_ITEMS.map((item) => (
-            <button key={item.id} onClick={() => goTo(item)}
-              className="nav-item flex items-center gap-1.5 text-sm rounded-t"
-              style={{
-                padding: '9px 12px',
-                fontWeight: nav === item.id ? 700 : 500,
-                color: nav === item.id ? '#fff' : 'rgba(255,255,255,0.55)',
-                background: nav === item.id ? 'rgba(15,45,82,0.5)' : 'transparent',
-                borderBottom: nav === item.id ? `2px solid ${C.gold}` : '2px solid transparent',
-              }}>
-
-              <item.icon size={15} />
-              <span>{item.label}</span>
-              {item.count > 0 && (
-                <span className="text-[10px] font-bold rounded-full" style={{
-                  padding: '1px 6px',
-                  background: item.id === 'kyc' ? 'rgba(181,72,46,0.35)' : item.id === 'pending' ? 'rgba(28,111,191,0.35)' : nav === item.id ? C.gold : 'rgba(255,255,255,0.18)',
-                  color: item.id === 'kyc' ? '#f3c9bd' : item.id === 'pending' ? '#bcdcff' : nav === item.id ? '#fff' : '#fff',
-                }}>
-                  {item.count}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="adm-topnav flex items-center overflow-x-auto" style={{ padding: '0 16px 10px', gap: 6 }}>
+          {NAV_ITEMS.map((item) => {
+            const on = nav === item.id;
+            return (
+              <button key={item.id} onClick={() => goTo(item)} className="flex items-center gap-1.5 text-[13px] rounded-full whitespace-nowrap"
+                style={{ padding: '6px 12px', fontWeight: on ? 600 : 500, color: on ? '#fff' : C.muted, background: on ? C.navy : '#F2F4F7' }}>
+                <item.icon size={14} />
+                {item.label}
+                {item.count > 0 && <span className="text-[10.5px] font-bold rounded-full" style={{ padding: '0 6px', background: on ? 'rgba(255,255,255,.22)' : '#fff', color: on ? '#fff' : C.ink }}>{item.count}</span>}
+              </button>
+            );
+          })}
         </div>
-      </div>
+      </header>
 
       {notifPanelOpen && (
         <>
           <div onClick={() => setNotifPanelOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} />
           <div className="fadein rounded-lg overflow-hidden" style={{
-            position: 'fixed', top: 66, right: 24, width: 360, maxHeight: 420, zIndex: 40,
+            position: 'fixed', top: 74, right: 24, width: 380, maxHeight: 460, zIndex: 40, borderRadius: 14,
             background: C.card, border: `1px solid ${C.border}`, boxShadow: '0px 12px 32px -4px rgba(10,33,64,0.22)',
             display: 'flex', flexDirection: 'column',
           }}>
@@ -2126,7 +2149,7 @@ export default function BlicPayAdmin() {
                 <button key={n.id} onClick={() => !n.read && markNotificationRead(n.id)}
                   className="bp-btn w-full text-left" style={{
                     padding: '11px 16px', borderTop: i ? `1px solid ${C.border}` : 'none',
-                    background: n.read ? C.card : '#FFFDF9',
+                    background: n.read ? C.card : '#F5FAFE',
                   }}>
                   <div className="flex items-start gap-2">
                     {!n.read && <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.gold, marginTop: 5, flexShrink: 0 }} />}
@@ -2144,133 +2167,171 @@ export default function BlicPayAdmin() {
       )}
 
       {/* kontni — pran tout lajè a kounye a */}
-      <div style={{ padding: '32px 40px', maxWidth: 1440, width: '100%', margin: '0 auto' }}>
+      <div style={{ padding: ['finance', 'agents'].includes(nav) ? 0 : '28px 32px 48px', maxWidth: 1400, width: '100%', margin: '0 auto' }}>
           {nav === 'overview' && (() => {
             const totalDeposit = financeData?.totalDepositVolume ?? 0;
             const totalWithdrawal = financeData?.totalWithdrawalVolume ?? 0;
-            const moncashReserve = reserves.find((r) => r.method === 'moncash')?.balance || 0;
-            const natcashReserve = reserves.find((r) => r.method === 'natcash')?.balance || 0;
-            const totalReserve = moncashReserve + natcashReserve;
-            // Fon kliyan yo = sa BLICPay dwe kliyan li yo (rekonsilyasyon), pa yon sòm volim.
+            const revenue = financeData?.totalRevenue ?? financeData?.breakdown?.withdrawalFees ?? 0;
             const totalBalance = recon?.totalLiabilities ?? 0;
+            const held = recon?.totalAssets ?? 0;
             const coveragePct = recon?.coverage != null ? Math.round(recon.coverage * 1000) / 10 : null;
+            const covOk = coveragePct == null || coveragePct >= 100;
+            const days = (financeData?.dailyVolume || []).slice(-30);
+            const maxVal = Math.max(1, ...days.map((d) => Math.max(d.deposits, d.withdrawals)));
+            const loc = CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR';
+            const first = (admin?.fullName || '').split(' ')[0];
+            const queue = [
+              { id: 'pending', icon: Wallet, label: tt("Depo pou valide"), count: pending.length, sub: money(totalPendingAmount), tone: C.amber },
+              { id: 'withdrawals', icon: ArrowDownLeft, label: tt("Retrè pou voye"), count: withdrawals.length, sub: money(totalWithdrawAmount), tone: C.danger },
+              { id: 'kyc', icon: ShieldCheck, label: tt("Dosye KYC pou tcheke"), count: kycSubmissions.length, tone: C.navy },
+              { id: 'monitoring', icon: ShieldAlert, label: tt("Alèt siveyans ouvè"), count: openAlerts, tone: C.purple },
+              { id: 'support', icon: Mail, label: tt("Mesaj Sipò"), count: supportMessages.length, tone: C.sky },
+            ];
+            const todo = queue.reduce((n, q) => n + q.count, 0);
             return (
             <div className="fadein">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-col md:flex-row md:items-end justify-between gap-3">
                 <div>
-                  <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: C.ink }}>
-                    {tt("Bonjou,")} {admin?.fullName}
-                  </h1>
-                  <p className="text-xs mt-1" style={{ color: C.muted }}>
-                    📅 {new Date().toLocaleDateString(CURRENT_LANG === 'en' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                  </p>
+                  <h1 style={{ ...fontDisplay, fontSize: 26, fontWeight: 700, color: C.ink }}>{tt("Bonjou,")} {first}</h1>
+                  <p className="text-[14px] mt-1" style={{ color: C.muted }}>{todo > 0 ? tt("Ou gen {0} eleman pou trete jodi a.", todo) : tt("Tout bagay ajou — pa gen anyen pou trete.")}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 text-[13px] rounded-lg" style={{ padding: '8px 12px', background: '#fff', border: `1px solid ${C.border}`, color: C.muted }}>
+                    <Calendar size={14} /> {new Date().toLocaleDateString(loc, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                  <button onClick={() => { loadFinance('all'); loadReserves(); loadRecon(); loadAlertCount(); loadPending(token); loadWithdrawals(); }} className="bp-btn w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: '#fff', border: `1px solid ${C.border}` }} aria-label={tt("Rafrechi")}>
+                    <RefreshCw size={15} color={C.muted} />
+                  </button>
                 </div>
               </div>
 
-              {/* Kat balans prensipal — done reyèl sèlman */}
-              <div className="rounded-2xl p-6 text-white relative overflow-hidden" style={{ marginTop: 18, background: `linear-gradient(120deg, ${C.navyDeep}, ${C.navy} 60%, #133863)`, border: `1px solid ${C.navy}` }}>
-                <div style={{ position: 'absolute', right: -60, top: -60, width: 280, height: 280, borderRadius: '50%', background: 'rgba(185,134,47,0.10)', filter: 'blur(50px)', pointerEvents: 'none' }} />
-                <div className="relative">
-                  <p className="text-[11px] font-bold uppercase tracking-widest" style={{ color: 'rgba(255,255,255,0.65)' }}>{tt("Fon kliyan yo (total balans)")}</p>
-                  <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 6 }}>
-                    <span style={{ ...fontMono, fontSize: 34, fontWeight: 800, color: '#fff' }}>{money(totalBalance)}</span>
-                    {exchangeRate && (
-                      <span style={{ ...fontMono, fontSize: 16, color: C.gold, fontWeight: 700 }}>
-                        ≈ ${(totalBalance / exchangeRate.rate).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD
-                      </span>
-                    )}
-                  </div>
-                  {exchangeRate && (
-                    <p className="text-[10px] mt-1" style={{ ...fontMono, color: 'rgba(255,255,255,0.5)' }}>{tt("Tal BRH: 1 USD =")} {exchangeRate.rate} {tt("HTG (")}{exchangeRate.rateDate})</p>
-                  )}
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs" style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
-                    <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Volim Depo (tout tan)")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{money(totalDeposit)}</p>
-                    </div>
-                    <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Kliyan aktif")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: '#fff', marginTop: 3 }}>{recon?.clients ?? '—'}</p>
-                    </div>
-                    <div>
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Fon BLICPay kenbe")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: C.gold, marginTop: 3 }}>{money(recon?.totalAssets ?? totalReserve)}</p>
-                    </div>
-                    <button onClick={() => setNav('reconciliation')} className="text-left">
-                      <p style={{ color: 'rgba(255,255,255,0.55)' }}>{tt("Kouvèti fon kliyan")}</p>
-                      <p style={{ ...fontMono, fontSize: 16, fontWeight: 700, color: coveragePct == null ? '#fff' : coveragePct >= 100 ? '#7EE2BF' : '#FFB4A2', marginTop: 3 }}>{coveragePct != null ? `${coveragePct}%` : '—'}</p>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 kat KPI operasyonèl, style Stitch */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3" style={{ marginTop: 18 }}>
-                {[
-                  { label: tt("Depo Ap Tann Validasyon"), value: tt("{0} demann", pending.length), sub: money(totalPendingAmount), tone: '#8A6423', bg: '#FBF0DE', tab: 'pending' },
-                  { label: tt("Demann Retrè Ap Tann"), value: tt("{0} demann", withdrawals.length), sub: money(totalWithdrawAmount), tone: C.danger, bg: '#FBEBE6', tab: 'withdrawals' },
-                  { label: tt("Alèt siveyans ouvè"), value: String(openAlerts), sub: tt("pou egzamine"), tone: C.purple, bg: '#F4EBFF', tab: 'monitoring' },
-                  { label: tt("Dosye KYC Pou Tcheke"), value: tt("{0} dosye", kycSubmissions.length), sub: tt("ap tann egzamen"), tone: C.navy, bg: '#E6F0FB', tab: 'kyc' },
-                ].map((c) => (
-                  <button key={c.label} onClick={() => setNav(c.tab)} className="bp-btn text-left bg-white rounded-xl" style={{ padding: 16, border: `1px solid ${C.border}` }}>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4" style={{ marginTop: 22 }}>
+                {/* Fon kliyan */}
+                <div className="xl:col-span-2 rounded-2xl text-white relative overflow-hidden flex flex-col" style={{ padding: '24px 26px', background: 'linear-gradient(125deg, #0B1F45 0%, #143A73 62%, #1A5E9A 100%)', boxShadow: '0 14px 34px -18px rgba(11,31,69,.7)' }}>
+                  <div style={{ position: 'absolute', right: -90, top: -110, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(41,182,232,.30), transparent 65%)', pointerEvents: 'none' }} />
+                  <div className="relative flex-1 flex flex-col">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: C.muted }}>{c.label}</span>
-                      <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: c.bg }}>
-                        <span style={{ width: 7, height: 7, borderRadius: '50%', background: c.tone, display: 'inline-block' }} />
+                      <p className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,.72)' }}>{tt("Fon kliyan yo (total balans)")}</p>
+                      <button onClick={() => setNav('reconciliation')} className="text-[12.5px] font-semibold inline-flex items-center gap-1 rounded-full" style={{ padding: '5px 10px', background: 'rgba(255,255,255,.10)', color: '#fff' }}>
+                        {tt("Rekonsilyasyon")} <ArrowUpRight size={13} />
+                      </button>
+                    </div>
+                    <div className="flex items-baseline gap-3 flex-wrap" style={{ marginTop: 8 }}>
+                      <span style={{ ...fontMono, fontSize: 38, fontWeight: 700, letterSpacing: '-0.03em' }}>{money(totalBalance)}</span>
+                      {exchangeRate && <span style={{ ...fontMono, fontSize: 15, color: '#8FDDF7', fontWeight: 600 }}>≈ ${(totalBalance / exchangeRate.rate).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} USD</span>}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4" style={{ marginTop: 22 }}>
+                      {[[tt("Fon BLICPay kenbe"), money(held)], [tt("Kliyan aktif"), recon?.clients ?? '—'], [tt("Tal BRH"), exchangeRate ? `${exchangeRate.rate} HTG` : '—']].map(([k, v]) => (
+                        <div key={k}>
+                          <p className="text-[12px]" style={{ color: 'rgba(255,255,255,.6)' }}>{k}</p>
+                          <p style={{ ...fontMono, fontSize: 16, fontWeight: 600, marginTop: 3 }}>{v}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 'auto', paddingTop: 22 }}>
+                      <div className="flex items-center justify-between text-[12px]">
+                        <span style={{ color: 'rgba(255,255,255,.7)' }}>{tt("Kouvèti fon kliyan")}</span>
+                        <span style={{ ...fontMono, fontWeight: 700, color: covOk ? '#7EE2BF' : '#FFB4A2' }}>{coveragePct != null ? `${coveragePct}%` : '—'}</span>
+                      </div>
+                      <div style={{ marginTop: 7, height: 6, borderRadius: 99, background: 'rgba(255,255,255,.14)', overflow: 'hidden' }}>
+                        <div style={{ width: `${Math.min(100, coveragePct ?? 0)}%`, height: '100%', borderRadius: 99, background: covOk ? 'linear-gradient(90deg,#29B6E8,#5FE0B5)' : '#FF8A73' }} />
                       </div>
                     </div>
-                    <p style={{ ...fontMono, fontSize: 19, fontWeight: 800, color: C.ink, marginTop: 8 }}>{c.value}</p>
-                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>{c.sub}</p>
-                  </button>
-                ))}
+                  </div>
+                </div>
+
+                {/* Pou trete */}
+                <div className="adm-card" style={{ padding: '18px 8px 8px' }}>
+                  <div className="flex items-center justify-between" style={{ padding: '0 12px 10px' }}>
+                    <p className="text-[15px] font-semibold" style={{ color: C.ink }}>{tt("Pou trete")}</p>
+                    <span className="text-[12px] font-semibold rounded-full" style={{ padding: '2px 9px', background: todo ? '#FDECEA' : '#E7F6EF', color: todo ? '#B3261E' : '#0E7A54' }}>{todo}</span>
+                  </div>
+                  {queue.map((q) => (
+                    <button key={q.id} onClick={() => setNav(q.id)} className="bp-btn w-full flex items-center gap-3 rounded-xl text-left" style={{ padding: '10px 12px' }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = '#F7F9FC'; }} onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}>
+                      <span className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ background: `${q.tone}14` }}><q.icon size={16} color={q.tone} /></span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[13.5px] font-medium truncate" style={{ color: C.ink }}>{q.label}</span>
+                        {q.sub && q.count > 0 && <span className="block text-[12px]" style={{ ...fontMono, color: C.muted }}>{q.sub}</span>}
+                      </span>
+                      <span style={{ ...fontMono, fontSize: 15, fontWeight: 700, color: q.count ? C.ink : C.faint }}>{q.count}</span>
+                      <ChevronRight size={15} color={C.faint} />
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Depo resan — done reyèl */}
-              <div className="bg-white rounded-2xl overflow-hidden" style={{ marginTop: 20, border: `1px solid ${C.border}` }}>
-                <div className="flex items-center justify-between" style={{ padding: 16, borderBottom: `1px solid ${C.border}` }}>
-                  <div>
-                    <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: C.ink }}>{tt("Dènye Depo Ap Tann")}</h2>
-                    <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt("Tout metòd — MonCash, NatCash, biwo")}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4" style={{ marginTop: 16 }}>
+                <StatCard icon={Wallet} accent={C.mint} label={tt("Volim Depo (tout tan)")} value={money(totalDeposit)} sub={tt("Depo konfime")} />
+                <StatCard icon={ArrowDownLeft} accent={C.danger} label={tt("Volim retrè")} value={money(totalWithdrawal)} sub={tt("Retrè konfime")} />
+                <StatCard icon={TrendingUp} accent={C.navy} label={tt("Revni")} value={money(revenue)} sub={tt("Frè retrè")} />
+                <StatCard icon={ArrowLeftRight} accent={C.sky} label={tt("Volim transfè")} value={money(financeData?.totalTransferVolume ?? 0)} sub={tt("Ant kliyan BLICPay")} />
+              </div>
+
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-4" style={{ marginTop: 16 }}>
+                <div className="adm-card xl:col-span-2" style={{ padding: '20px 22px' }}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <p className="text-[15px] font-semibold" style={{ color: C.ink }}>{tt("Aktivite 30 dènye jou")}</p>
+                      <p className="text-[12.5px]" style={{ color: C.muted }}>{tt("Depo ak retrè konfime, pa jou")}</p>
+                    </div>
+                    <div className="flex items-center gap-4 text-[12.5px]" style={{ color: C.muted }}>
+                      <span className="inline-flex items-center gap-1.5"><span style={{ width: 10, height: 10, borderRadius: 3, background: C.navy }} />{tt("Depo")}</span>
+                      <span className="inline-flex items-center gap-1.5"><span style={{ width: 10, height: 10, borderRadius: 3, background: C.cyan }} />{tt("Retrè")}</span>
+                    </div>
                   </div>
-                  <button onClick={() => setNav('pending')} className="text-xs font-semibold flex items-center gap-1" style={{ color: C.navy }}>
-                    {tt("Wè tout")} <ChevronRight size={13} />
-                  </button>
+                  {days.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-sm" style={{ height: 200, color: C.muted }}>
+                      <Activity size={22} color={C.faint} style={{ marginBottom: 8 }} />{tt("Pa gen aktivite pou kounye a.")}
+                    </div>
+                  ) : (
+                    <div style={{ marginTop: 18 }}>
+                      <svg viewBox={`0 0 ${days.length * 24} 180`} preserveAspectRatio="none" style={{ width: '100%', height: 200, display: 'block' }}>
+                        {[0, 0.25, 0.5, 0.75, 1].map((g) => <line key={g} x1="0" x2={days.length * 24} y1={10 + g * 150} y2={10 + g * 150} stroke="#EEF1F5" strokeWidth="1" vectorEffect="non-scaling-stroke" />)}
+                        {days.map((d, i) => {
+                          const hd = (d.deposits / maxVal) * 150; const hw = (d.withdrawals / maxVal) * 150;
+                          return (
+                            <g key={d.date}>
+                              <rect x={i * 24 + 4} y={160 - hd} width="7.5" height={hd} rx="2" fill={C.navy}><title>{`${d.date} · ${money(d.deposits)}`}</title></rect>
+                              <rect x={i * 24 + 12.5} y={160 - hw} width="7.5" height={hw} rx="2" fill={C.cyan}><title>{`${d.date} · ${money(d.withdrawals)}`}</title></rect>
+                            </g>
+                          );
+                        })}
+                      </svg>
+                      <div className="flex justify-between text-[11.5px]" style={{ color: C.faint, marginTop: 6 }}>
+                        <span>{new Date(days[0].date).toLocaleDateString(loc, { day: '2-digit', month: 'short' })}</span>
+                        <span>{new Date(days[days.length - 1].date).toLocaleDateString(loc, { day: '2-digit', month: 'short' })}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                {pending.length === 0 ? (
-                  <p className="text-sm p-6 text-center" style={{ color: C.muted }}>{tt("Pa gen depo k'ap tann.")}</p>
-                ) : (
-                  <table className="w-full text-left" style={{ borderCollapse: 'collapse' }}>
-                    <thead>
-                      <tr style={{ background: C.bg }}>
-                        <Th>{tt("Kliyan")}</Th><Th>{tt("Referans")}</Th><Th align="right">{tt("Montan")}</Th><Th align="center">{tt("Estati")}</Th>
-                      </tr>
-                    </thead>
-                    <tbody className="text-xs">
-                      {pending.slice(0, 5).map((d) => {
-                        const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
-                        return (
-                          <tr key={d.id} style={{ borderTop: `1px solid ${C.border}` }}>
-                            <Td>
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden" style={{ background: M.logo ? '#fff' : M.color, border: M.logo ? `1px solid ${C.border}` : 'none' }}>
-                                  {M.logo ? <img src={M.logo} alt={M.label} className="w-full h-full object-cover" /> : <M.icon size={13} color="#fff" />}
-                                </div>
-                                <div>
-                                  <p className="font-bold" style={{ color: C.ink }}>{d.user}</p>
-                                  <p style={{ ...fontMono, fontSize: 10.5, color: C.muted }}>{d.phone}</p>
-                                </div>
-                              </div>
-                            </Td>
-                            <Td><span style={{ ...fontMono, fontSize: 11 }}>{d.reference}</span></Td>
-                            <Td align="right"><span style={{ ...fontMono, fontWeight: 700 }}>+{money(d.amount)}</span></Td>
-                            <Td align="center"><Badge tone="amber">{tt("Ap tann")}</Badge></Td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                )}
+
+                <div className="adm-card overflow-hidden">
+                  <div className="flex items-center justify-between" style={{ padding: '18px 20px 12px' }}>
+                    <p className="text-[15px] font-semibold" style={{ color: C.ink }}>{tt("Dènye Depo Ap Tann")}</p>
+                    <button onClick={() => setNav('pending')} className="text-[12.5px] font-semibold inline-flex items-center gap-0.5" style={{ color: C.sky }}>{tt("Wè tout")} <ChevronRight size={14} /></button>
+                  </div>
+                  {pending.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-sm" style={{ padding: '36px 16px 44px', color: C.muted }}>
+                      <span className="w-11 h-11 rounded-full flex items-center justify-center" style={{ background: '#E7F6EF', marginBottom: 10 }}><Check size={20} color={C.mint} /></span>
+                      {tt("Pa gen depo k'ap tann.")}
+                    </div>
+                  ) : pending.slice(0, 6).map((d) => {
+                    const M = methodIcons[d.method] || { icon: DollarSign, color: C.muted, label: d.method };
+                    return (
+                      <button key={d.id} onClick={() => setNav('pending')} className="w-full flex items-center gap-3 text-left" style={{ padding: '11px 20px', borderTop: `1px solid ${C.border}` }}>
+                        <span className="w-9 h-9 rounded-full overflow-hidden flex items-center justify-center shrink-0" style={{ background: M.logo ? '#fff' : M.color, border: `1px solid ${C.border}` }}>
+                          {M.logo ? <img src={M.logo} alt="" className="w-full h-full object-cover" /> : <M.icon size={14} color="#fff" />}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[13.5px] font-medium truncate" style={{ color: C.ink }}>{d.user}</span>
+                          <span className="block text-[12px] truncate" style={{ color: C.muted }}>{d.reference}</span>
+                        </span>
+                        <span style={{ ...fontMono, fontSize: 13.5, fontWeight: 600, color: C.ink }}>{money(d.amount)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             );
@@ -2332,7 +2393,7 @@ export default function BlicPayAdmin() {
                           <p className="text-sm font-semibold">{d.user}</p>
                           <p className="text-xs mt-0.5" style={{ color: C.muted }}>{d.phone} · {d.date}</p>
                           {d.branch && (
-                            <p className="text-xs mt-0.5 font-semibold" style={{ color: C.navy }}>📍 {d.branch}</p>
+                            <p className="text-xs mt-0.5 font-semibold" style={{ color: C.navy }}>{d.branch}</p>
                           )}
                           <p className="text-xs mt-0.5" style={{ ...fontMono, color: C.muted }}>{d.reference}</p>
                           {d.transactionId && (
@@ -2389,7 +2450,7 @@ export default function BlicPayAdmin() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{d.user}</p>
-                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt(M.label)} · {d.date}{d.branch ? ` · 📍 ${d.branch}` : ''}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt(M.label)} · {d.date}{d.branch ? ` · ${d.branch}` : ''}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
@@ -2405,7 +2466,7 @@ export default function BlicPayAdmin() {
               )}
 
               {depositView === 'pending' && (
-              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
+              <div className="mt-6 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>
                 <AlertCircle size={15} className="shrink-0 mt-0.5" />
                 {tt("Verifye referans lan ak resi kach la anvan ou konfime yon depo biwo.")}
               </div>
@@ -2661,7 +2722,7 @@ export default function BlicPayAdmin() {
                           </div>
                           <div>
                             <p className="text-sm font-semibold">{w.user}</p>
-                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt(M.label)} · {w.date}{w.branch ? ` · 📍 ${w.branch}` : ''}</p>
+                            <p className="text-xs mt-0.5" style={{ color: C.muted }}>{tt(M.label)} · {w.date}{w.branch ? ` · ${w.branch}` : ''}</p>
                             {w.destinationNumber && (
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <p className="text-xs" style={{ ...fontMono, color: C.muted }}>→ {w.destinationNumber} ({w.destinationName})</p>
@@ -3058,7 +3119,7 @@ export default function BlicPayAdmin() {
                       <p className="text-sm mt-4" style={{ color: C.muted }}>{tt("Ap chaje rapò a...")}</p>
                     ) : (
                       <>
-                        <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EFE7D8', color: C.navy }}>
+                        <div className="mt-4 flex items-start gap-2 text-xs p-3 rounded-lg" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>
                           <ShieldCheck size={15} className="shrink-0 mt-0.5" />
                           {tt("Didit deja analize dokiman an, selfi a (liveness + face match), ak yon egzamen AML. Egzamine rapò a anba a anvan ou deside.")}
                         </div>
@@ -3350,7 +3411,7 @@ export default function BlicPayAdmin() {
                           <Td>{u.phone}</Td>
                           <Td><span style={fontMono} className="text-xs">{u.clientId || '—'}</span></Td>
                           <Td align="right"><span className="font-semibold">{money(u.balance)}</span></Td>
-                          <Td align="center"><Badge tone={u.verified ? 'mint' : 'amber'}>{u.verified ? tt("Wi") : tt("Non")}</Badge></Td>
+                          <Td align="center"><Badge tone={u.verified ? 'mint' : 'amber'}>{u.verified ? tt("Wi") : tt("Non@@no")}</Badge></Td>
                           <Td align="center"><div className="flex items-center justify-center gap-1.5 flex-wrap"><Badge tone={u.blocked ? 'danger' : 'mint'}>{u.blocked ? tt("Bloke") : tt("Aktif")}</Badge>{privateBeta && u.role === 'member' && (u.betaAccess ? <Badge tone="navy">{tt("Aksè tès")}</Badge> : <Badge tone="muted">{tt("San aksè")}</Badge>)}</div></Td>
                         </tr>
                       ))}
@@ -3581,7 +3642,7 @@ export default function BlicPayAdmin() {
       )}
 
       {nav === 'finance' && (
-        <div className="fadein">
+        <div className="fadein" style={{ padding: '28px 32px 48px', maxWidth: 1400, width: '100%', margin: '0 auto' }}>
           <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>{tt("Finans")}</h1>
           <p className="text-sm" style={{ color: C.muted, marginTop: 4 }}>
             {admin?.role === 'agent' ? tt("Volim ou jenere nan siikisal {0}.", admin?.branch || '') : tt("Vi jeneral sou volim ak revni BLICPay — detaye pa sous ak pa siikisal.")}
@@ -3662,7 +3723,7 @@ export default function BlicPayAdmin() {
               <div className={`grid grid-cols-2 ${admin?.role === 'agent' ? 'lg:grid-cols-3' : 'lg:grid-cols-5'}`} style={{ gap: 12, marginTop: 18 }}>
                 {admin?.role !== 'agent' && (
                 <div className="rounded-2xl relative overflow-hidden flex flex-col items-center text-center" style={{ padding: '20px 16px', background: `linear-gradient(160deg, ${C.navy}, ${C.navyDeep})` }}>
-                  <div style={{ position: 'absolute', bottom: -50, left: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(185,134,47,0.14)' }} />
+                  <div style={{ position: 'absolute', bottom: -50, left: -30, width: 130, height: 130, borderRadius: '50%', background: 'rgba(41,182,232,0.16)' }} />
                   <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ position: 'relative', background: 'rgba(255,255,255,0.12)', marginBottom: 10 }}>
                     <TrendingUp size={16} color="#fff" />
                   </div>
@@ -3775,7 +3836,7 @@ export default function BlicPayAdmin() {
                       style={{ background: C.card, borderTop: i ? `1px solid ${C.border}` : 'none' }}>
                       <div className="flex items-center gap-2.5">
                         {i === 0 && stats.fees > 0 && (
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EFE7D8' }}>
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7' }}>
                             <span style={{ fontSize: 12 }}>🏆</span>
                           </div>
                         )}
@@ -3792,7 +3853,7 @@ export default function BlicPayAdmin() {
               )}
 
               {admin?.role !== 'agent' && (
-              <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EFE7D8', color: C.navy }}>
+              <div className="flex items-start gap-2 text-xs rounded-lg" style={{ marginTop: 20, padding: 12, background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>
                 <AlertCircle size={14} className="shrink-0 mt-0.5" />
                 {tt("Kat \"Kliyan sèvi\" anlè a konte TOUT kliyan (menm depo MonCash otomatik yo). Nan detay chak siikisal (klike sou li), \"Kliyan sèvi\" konte sèlman sa yon AJAN konfime pandan peryòd la.")}
               </div>
@@ -3803,7 +3864,7 @@ export default function BlicPayAdmin() {
       )}
 
       {nav === 'agents' && (
-        <div className="fadein">
+        <div className="fadein" style={{ padding: '28px 32px 48px', maxWidth: 1400, width: '100%', margin: '0 auto' }}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div>
               <h1 style={{ ...fontDisplay, fontWeight: 800, fontSize: 26 }}>{tt("Ajan")}</h1>
@@ -3826,7 +3887,7 @@ export default function BlicPayAdmin() {
             <span className="text-xs font-medium" style={{ color: C.muted }}>{tt("Siikisal:")}</span>
             {branches.map((b) => (
               <span key={b.id} title={tt("Klike pou modifye")} className="bp-btn flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-semibold cursor-pointer"
-                onClick={() => openBranchEdit(b)} style={{ background: '#EFE7D8', color: C.navy }}>
+                onClick={() => openBranchEdit(b)} style={{ background: '#EEF5FD', border: '1px solid #D6E6F7', color: C.navy }}>
                 {b.name} <span style={{ ...fontMono, opacity: 0.65, fontSize: 10.5 }}>{b.code}</span>
                 <button onClick={(e) => { e.stopPropagation(); deleteBranch(b); }} title={tt("Efase siikisal la")} aria-label={tt("Efase siikisal la")}
                   className="bp-btn w-4 h-4 rounded-full flex items-center justify-center" style={{ background: 'rgba(11,27,51,0.12)' }}>
@@ -4065,7 +4126,7 @@ export default function BlicPayAdmin() {
             position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: '90%', maxWidth: 380,
             background: C.card, borderRadius: 16, zIndex: 53, padding: 24,
           }}>
-            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#F3E8D2' }}>
+            <div className="flex items-start gap-2 p-3 rounded-lg mb-4" style={{ background: '#EEF5FD', border: '1px solid #D6E6F7' }}>
               <AlertCircle size={16} color="#8A6423" className="shrink-0 mt-0.5" />
               <p className="text-xs" style={{ color: '#8A6423' }}>
                 {tt("Verifye peman an FINI e reyèlman rive nan kont ou anvan ou konfime — aksyon sa a p ap ka anile.")}
