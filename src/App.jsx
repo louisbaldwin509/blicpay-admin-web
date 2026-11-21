@@ -5,6 +5,7 @@ import {
   AlertCircle, ChevronRight, ChevronLeft, Search, RefreshCw, ArrowDownLeft,
   PiggyBank, HandCoins, FileText, User, Phone, Lock, KeyRound, BadgeCheck, Eye, TrendingUp, UserPlus, Mail,
   ShieldAlert, Scale, ScrollText, Gauge, Filter, Download, Landmark, Calendar, MapPin, Activity, ArrowUpRight, Inbox, Settings,
+  CreditCard, PauseCircle, PlayCircle, Plus, Power,
 } from 'lucide-react';
 
 import { ADMIN_DICT } from './i18n/adminDict.js';
@@ -835,6 +836,158 @@ function MonitoringPage({ token, flash }) {
   );
 }
 
+// ------------------------------ REZÈV KAT (USDC) ------------------------------
+// USDC BLICPAY LLC pre-depoze kot emetè kat la. Chak depo kliyan pran sou li.
+// Si rezèv la ba: depo limite (oranj) oswa koupe otomatikman (wouj).
+const FLOAT_LEVELS = {
+  green: { label: 'Nòmal', bg: 'linear-gradient(120deg, #0F5C47, #1E9E7C)', dot: '#22C55E', text: 'Depo yo louvri nòmalman.' },
+  orange: { label: 'Ba', bg: 'linear-gradient(120deg, #8A4B08, #D97706)', dot: '#F59E0B', text: 'Depo yo limite a {0} maks pa rechaj.' },
+  red: { label: 'Koupe', bg: 'linear-gradient(120deg, #7A1F1F, #C0392B)', dot: '#EF4444', text: 'Tout depo kliyan yo koupe.' },
+  off: { label: 'Pa aktive', bg: 'linear-gradient(120deg, #1E293B, #475569)', dot: '#94A3B8', text: 'Pwoteksyon an pa aktive — depo yo pa limite pa rezèv la.' },
+};
+const usd = (n) => `${Number(n || 0).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+
+function CardFloatPage({ token, flash, isAdmin }) {
+  const [f, setF] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [add, setAdd] = useState('');
+  const [setBal, setSetBal] = useState('');
+  const [th, setTh] = useState(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function load() {
+    setLoading(true);
+    try { const r = await apiFetch('/admin/card-float', { token }); setF(r.float); setTh({ orangeBelowUsd: r.float.orangeBelowUsd, redBelowUsd: r.float.redBelowUsd, orangeMaxUsd: r.float.orangeMaxUsd, holdMinutes: r.float.holdMinutes }); }
+    catch (e) { flash(e.message); } finally { setLoading(false); }
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function patch(body, ok) {
+    setBusy(true);
+    try { const r = await apiFetch('/admin/card-float', { method: 'PATCH', token, body }); setF(r.float); flash(ok); return true; }
+    catch (e) { flash(e.message); return false; } finally { setBusy(false); }
+  }
+
+  if (!f) return <div className="fadein"><PageHead icon={CreditCard} title={tt('Rezèv kat')} sub={tt('USDC BLICPAY LLC pre-depoze pou kredite kat kliyan yo.')} /><p className="text-sm" style={{ color: C.muted }}>{tt('Ap chaje...')}</p></div>;
+
+  const L = FLOAT_LEVELS[f.level] || FLOAT_LEVELS.off;
+  const pct = f.orangeBelowUsd > 0 ? Math.max(0, Math.min(100, (f.availableUsd / (f.orangeBelowUsd * 2)) * 100)) : 100;
+  const redPct = f.orangeBelowUsd > 0 ? (f.redBelowUsd / (f.orangeBelowUsd * 2)) * 100 : 0;
+  const card = { border: `1px solid ${C.border}` };
+  const inp = 'w-full px-3 py-2 rounded-lg text-sm';
+
+  return (
+    <div className="fadein">
+      <PageHead icon={CreditCard} title={tt('Rezèv kat')} sub={tt('USDC BLICPAY LLC pre-depoze pou kredite kat kliyan yo. Si rezèv la ba, depo yo limite oswa koupe otomatikman.')}
+        right={<button onClick={load} className="bp-btn px-3 py-2 rounded-lg text-sm font-semibold flex items-center gap-1.5 bg-white" style={card}><RefreshCw size={14} className={loading ? 'animate-spin' : ''} />{tt('Rafrechi')}</button>} />
+
+      <div className="rounded-2xl p-6 text-white relative overflow-hidden" style={{ background: L.bg }}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold uppercase tracking-widest" style={{ background: 'rgba(255,255,255,.15)' }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: L.dot, boxShadow: `0 0 0 3px rgba(255,255,255,.25)` }} />{tt(L.label)}{f.manualPause ? ` · ${tt('Poz manyèl')}` : ''}
+            </div>
+            <p className="mt-3 text-[11px] uppercase tracking-widest opacity-80">{tt('Disponib pou rechaj')}</p>
+            <p style={{ ...fontMono, fontSize: 38, fontWeight: 800, lineHeight: 1.1 }}>{usd(f.availableUsd)}</p>
+            <p className="text-sm opacity-90 mt-1">{tt(L.text, f.maxDepositUsd != null ? usd(f.maxDepositUsd) : '')}{f.manualPause && f.pauseNote ? ` — ${f.pauseNote}` : ''}</p>
+          </div>
+          <div className="grid grid-cols-3 gap-3 md:min-w-[420px]">
+            {[[tt('Balans rezèv'), usd(f.balanceUsd)], [tt('Bloke (depo annatant)'), usd(f.heldUsd)], [tt('Maks pa depo'), f.maxDepositUsd == null ? '—' : usd(f.maxDepositUsd)]].map(([k, v]) => (
+              <div key={k} className="rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,.12)' }}>
+                <p className="text-[10px] uppercase tracking-wider opacity-80">{k}</p>
+                <p style={{ ...fontMono, fontWeight: 700, fontSize: 16 }}>{v}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="mt-5">
+          <div className="relative h-2.5 rounded-full" style={{ background: 'rgba(255,255,255,.2)' }}>
+            <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${pct}%`, background: '#fff' }} />
+            <div className="absolute -top-1 -bottom-1 w-0.5" style={{ left: `${redPct}%`, background: '#FCA5A5' }} title={tt('Sèy wouj')} />
+            <div className="absolute -top-1 -bottom-1 w-0.5" style={{ left: '50%', background: '#FCD34D' }} title={tt('Sèy oranj')} />
+          </div>
+          <div className="relative h-4 text-[10px] mt-1.5 opacity-85" style={fontMono}>
+            <span className="absolute left-0">0 $</span>
+            <span className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: `${redPct}%` }}>🔴 {usd(f.redBelowUsd)}</span>
+            <span className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: '50%' }}>🟠 {usd(f.orangeBelowUsd)}</span>
+            <span className="absolute right-0">{usd(f.orangeBelowUsd * 2)}</span>
+          </div>
+        </div>
+        <p className="text-[11px] opacity-70 mt-3">{tt('Tal BRH: 1 $ = {0} HTG', f.rate)} · {f.maxDepositHtg != null ? tt('Maks kliyan an wè: {0} HTG', Number(f.maxDepositHtg).toLocaleString('fr-FR')) : tt('Pa gen limit')}</p>
+      </div>
+
+      {!isAdmin ? <p className="text-sm mt-4" style={{ color: C.muted }}>{tt('Sèlman yon sipè admin ka modifye rezèv la.')}</p> : (
+      <div className="grid lg:grid-cols-3 gap-4 mt-4">
+        {/* Balans */}
+        <div className="bg-white rounded-xl p-5" style={card}>
+          <div className="flex items-center gap-2 mb-1"><Plus size={16} color={C.navy} /><p className="text-sm font-bold">{tt('Ajoute USDC')}</p></div>
+          <p className="text-xs mb-3" style={{ color: C.muted }}>{tt('Lè w fin voye USDC kot emetè a, antre montan an isit la.')}</p>
+          <div className="flex gap-2">
+            <input value={add} onChange={(e) => setAdd(e.target.value.replace(/[^\d.]/g, ''))} placeholder="500" className={inp} style={{ ...fontMono, border: `1px solid ${C.border}` }} />
+            <button disabled={busy || !Number(add)} onClick={async () => { if (await patch({ addUsd: Number(add) }, tt('Rezèv la mete ajou.'))) setAdd(''); }} className="px-4 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: C.navy }}>{tt('Ajoute')}</button>
+          </div>
+          <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${C.border}` }}>
+            <p className="text-xs font-semibold mb-2">{tt('Korije balans lan (balans reyèl kot emetè a)')}</p>
+            <div className="flex gap-2">
+              <input value={setBal} onChange={(e) => setSetBal(e.target.value.replace(/[^\d.]/g, ''))} placeholder={String(f.balanceUsd)} className={inp} style={{ ...fontMono, border: `1px solid ${C.border}` }} />
+              <button disabled={busy || setBal === ''} onClick={async () => { if (await patch({ balanceUsd: Number(setBal) }, tt('Rezèv la mete ajou.'))) setSetBal(''); }} className="px-4 rounded-lg text-sm font-semibold bg-white disabled:opacity-50" style={card}>{tt('Anrejistre')}</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Sèy */}
+        <div className="bg-white rounded-xl p-5" style={card}>
+          <div className="flex items-center gap-2 mb-1"><Gauge size={16} color={C.navy} /><p className="text-sm font-bold">{tt('Sèy yo')}</p></div>
+          <p className="text-xs mb-3" style={{ color: C.muted }}>{tt('An dola USD. Sistèm nan koupe yon ti jan anvan 0 pou kouvri frè ak varyasyon tal la.')}</p>
+          {[['orangeBelowUsd', '🟠 ' + tt('Oranj anba')], ['redBelowUsd', '🔴 ' + tt('Wouj (koupe) anba')], ['orangeMaxUsd', tt('Maks pa depo an oranj')], ['holdMinutes', tt('Tan blokaj MonCash (minit)')]].map(([k, label]) => (
+            <label key={k} className="flex items-center justify-between gap-3 py-1.5 text-sm">
+              <span>{label}</span>
+              <input value={th[k]} onChange={(e) => setTh({ ...th, [k]: e.target.value.replace(/[^\d.]/g, '') })} className="w-28 px-2 py-1.5 rounded-md text-sm text-right" style={{ ...fontMono, border: `1px solid ${C.border}` }} />
+            </label>
+          ))}
+          <button disabled={busy} onClick={() => patch({ orangeBelowUsd: Number(th.orangeBelowUsd), redBelowUsd: Number(th.redBelowUsd), orangeMaxUsd: Number(th.orangeMaxUsd), holdMinutes: Number(th.holdMinutes) }, tt('Sèy yo anrejistre.'))} className="mt-3 w-full py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: C.navy }}>{tt('Anrejistre sèy yo')}</button>
+        </div>
+
+        {/* Kontwòl */}
+        <div className="bg-white rounded-xl p-5" style={card}>
+          <div className="flex items-center gap-2 mb-1"><Power size={16} color={C.navy} /><p className="text-sm font-bold">{tt('Kontwòl')}</p></div>
+          <div className="flex items-center justify-between py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+            <div className="pr-3"><p className="text-sm font-semibold">{tt('Pwoteksyon rezèv')}</p><p className="text-xs" style={{ color: C.muted }}>{tt('Lè l aktive, depo yo swiv nivo rezèv la.')}</p></div>
+            <button disabled={busy} onClick={() => patch({ enabled: !f.enabled }, f.enabled ? tt('Pwoteksyon an dezaktive.') : tt('Pwoteksyon an aktive.'))} className="relative w-11 h-6 rounded-full shrink-0 transition" style={{ background: f.enabled ? '#16A34A' : '#CBD5E1' }}>
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all" style={{ left: f.enabled ? 22 : 2 }} />
+            </button>
+          </div>
+          <div className="pt-3">
+            <p className="text-sm font-semibold">{tt('Poz manyèl')}</p>
+            <p className="text-xs mb-2" style={{ color: C.muted }}>{tt('Pou yon ijans, yon antretyen oswa yon pwoblèm MonCash.')}</p>
+            {f.manualPause ? (
+              <button disabled={busy} onClick={() => patch({ manualPause: false }, tt('Depo yo reaktive.'))} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: '#16A34A' }}><PlayCircle size={16} />{tt('Reaktive depo yo')}</button>
+            ) : (
+              <>
+                <input value={note} onChange={(e) => setNote(e.target.value)} placeholder={tt('Rezon (opsyonèl)')} className={inp + ' mb-2'} style={{ border: `1px solid ${C.border}` }} />
+                <button disabled={busy || !f.enabled} onClick={async () => { if (await patch({ manualPause: true, pauseNote: note }, tt('Depo yo sispann.'))) setNote(''); }} className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 disabled:opacity-50" style={{ background: '#C0392B' }}><PauseCircle size={16} />{tt('Sispann depo yo')}</button>
+                {!f.enabled && <p className="text-[11px] mt-1.5" style={{ color: C.muted }}>{tt('Aktive pwoteksyon an anvan.')}</p>}
+              </>
+            )}
+          </div>
+        </div>
+      </div>)}
+
+      <div className="bg-white rounded-xl p-5 mt-4 text-sm" style={card}>
+        <p className="font-bold mb-2">{tt('Kijan sa mache')}</p>
+        <ul className="space-y-1.5 text-[13px]" style={{ color: C.muted }}>
+          <li>🟢 {tt('Nòmal: depo yo louvri, men yon depo pa janm ka depase sa ki disponib.')}</li>
+          <li>🟠 {tt('Ba: depo yo limite, epi admin yo resevwa yon alèt (notifikasyon + imèl).')}</li>
+          <li>🔴 {tt('Koupe: tout depo yo bloke. Kliyan an wè « Rechaj yo pa disponib pou kounye a ». Peman ak kat la kontinye mache.')}</li>
+          <li>🔒 {tt('Montan yon depo bloke depi kliyan an kòmanse l — de kliyan pa ka pran menm dènye dola yo.')}</li>
+          <li>↩️ {tt('Depi w ajoute USDC, depo yo relouvri otomatikman.')}</li>
+        </ul>
+      </div>
+    </div>
+  );
+}
+
 // ------------------------------ REKONSILYASYON ------------------------------
 function ReconciliationPage({ token, flash }) {
   const [data, setData] = useState(null);
@@ -981,6 +1134,7 @@ const AUDIT_ACTIONS = [
   [/^(PATCH|PUT) \/branches/, 'Modifye siikisal@@audit'],
   [/^DELETE \/branches/, 'Efase siikisal'],
   [/\/reserves\/:method/, 'Mete rezèv ajou'],
+  [/\/card-float/, 'Mete rezèv kat ajou'],
   [/\/monitoring\/alerts/, 'Desizyon sou alèt'],
   [/\/support/, 'Mesaj sipò'],
 ];
@@ -2046,6 +2200,7 @@ export default function BlicPayAdmin() {
   const NAV_ITEMS_ALL = [
     { id: 'overview', section: 'general', label: tt("Apèsi"), icon: LayoutGrid, onOpen: () => { loadExchangeRate(); loadFinance('all'); loadReserves(); loadRecon(); loadAlertCount(); }, adminOnly: true },
     { id: 'finance', section: 'general', label: tt("Finans"), icon: TrendingUp, onOpen: () => { loadFinance(); loadReserves(); }, adminOnly: false },
+    { id: 'cardFloat', section: 'general', label: tt("Rezèv kat"), icon: CreditCard },
     { id: 'pending', section: 'ops', label: tt("Depo"), icon: Wallet, count: pending.length },
     { id: 'withdrawals', section: 'ops', label: tt("Retrait"), icon: ArrowDownLeft, count: withdrawals.length, onOpen: () => { loadWithdrawals(); loadReserves(); } },
     { id: 'transfers', section: 'ops', label: tt("Transfè"), icon: ArrowLeftRight, onOpen: () => loadTransfers(), adminOnly: true },
@@ -3228,6 +3383,7 @@ export default function BlicPayAdmin() {
           {nav === 'business' && <BusinessReview token={token} />}
           {nav === 'monitoring' && <MonitoringPage token={token} flash={flash} />}
           {nav === 'reconciliation' && <ReconciliationPage token={token} flash={flash} />}
+          {nav === 'cardFloat' && <CardFloatPage token={token} flash={flash} isAdmin={admin?.role === 'admin'} />}
           {nav === 'audit' && <AuditPage token={token} flash={flash} />}
 
           {nav === 'kyc' && (
